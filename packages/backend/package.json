@@ -1,0 +1,15 @@
+{
+  "name": "@activity-racer/backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@activity-racer/shared": "*"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.148"
+  }
+}
