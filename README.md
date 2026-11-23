@@ -15,7 +15,7 @@ Activity Racer is built on AWS serverless services designed for **$0 idle cost**
 - **Amazon API Gateway (HTTP API):** Serves backend endpoints under `/api/*` (to prevent path collisions with React Router SPA routes).
 - **AWS Lambda (TypeScript, Node.js 22, ARM64):** Handles API logic and Home Assistant webhook ingestion, bundled locally with `esbuild`.
 - **Amazon DynamoDB (On-Demand):** Single-table store (`PK`/`SK` + `GSI1`) for player profiles, groups, memberships, and daily activity stats.
-- **Amazon Cognito (Phase 2):** User Pool authentication paired with API Gateway's built-in JWT Authorizer (`event.requestContext.authorizer.jwt.claims.sub`).
+- **Amazon Cognito:** User Pool (`activity-racer-users`) + public SPA client (`activity-racer-spa`) paired with API Gateway's built-in JWT Authorizer (`event.requestContext.authorizer.jwt.claims.sub`).
 - **Amazon S3 (Private) + SPA Hosting:** Built Vite assets and a CDK-generated runtime `/config.json` are stored in a private S3 bucket:
   - **Default (Option B3):** Served over HTTPS via a lightweight read-only `SpaHostingFunction` Lambda (`GET /`, `GET /{proxy+}`) on the existing HTTP API Gateway while CloudFront project verification is pending.
   - **CloudFront OAC:** Enable with `-c enableCloudFront=true` to place a CloudFront distribution with Origin Access Control in front of the private S3 bucket (using 403/404 → `/index.html` error responses for SPA routing, with no Lambda@Edge).
@@ -41,16 +41,18 @@ activity-racer/
 ### 1. `packages/shared` (`@activity-racer/shared`)
 - **Purpose:** Single source of truth for domain types, API request/response DTOs, and pure scoring/handicapping math shared between Lambda and React.
 - **Design:** Exports TypeScript directly from `src/index.ts` so Vite and CDK's `esbuild` bundler consume it with zero intermediate build step.
-- **Current contents:** `HealthResponse` and `RuntimeConfig` contracts (`src/types.ts`).
-- **Planned additions (Phase 2):** Group, Player, DailyStat, RaceStanding DTOs, and weighted daily/weekly progress calculations (`src/scoring.ts`).
+- **Current contents:** Domain types & API DTOs (`src/types.ts`), weighted daily & Monday–Sunday calendar-week scoring helpers (`src/scoring.ts`), and native Node test suite (`src/scoring.test.ts`).
 
 ### 2. `packages/backend` (`@activity-racer/backend`)
 - **Purpose:** Serverless Lambda handlers and backend utilities.
 - **Design:** Individual handler entry points under `src/handlers/` bundled independently by CDK's `NodejsFunction` (`esbuild`, minified, ARM64) for small cold starts and least-privilege IAM scoping per function.
 - **Current handlers:**
   - `src/handlers/health.ts` — `GET /api/health` liveness check returning service name, Region, and timestamp.
-  - `src/handlers/spa.ts` — Option B3 static SPA server reading from the private frontend S3 bucket with path-traversal guards, MIME/binary handling, immutable caching for `/assets/*`, `no-store` for `index.html`/`config.json`, and extensionless SPA fallback to `index.html`.
-- **Planned handlers (Phase 2):** `ingestStats.ts` (`POST /api/stats` with `x-api-key`), `player.ts` (`GET/PUT /api/me`), `groups.ts` (`POST /api/groups`, `POST /api/groups/join`, `GET /api/groups`), and `race.ts` (`GET /api/groups/{groupId}/race`).
+  - `src/handlers/ingestStats.ts` — `POST /api/stats` Home Assistant webhook protected by per-player `x-api-key` (constant-time comparison) + `playerSlug`.
+  - `src/handlers/player.ts` — `GET /api/me` and `PUT /api/me` (lazy profile initialization, targets/weights validation, atomic `playerSlug` uniqueness, and `webhookApiKey` rotation).
+  - `src/handlers/groups.ts` — `GET /api/groups`, `POST /api/groups`, and `POST /api/groups/join` (transactional group creation & invite-code joining).
+  - `src/handlers/race.ts` — `GET /api/groups/{groupId}/race?range=daily|weekly&date=YYYY-MM-DD` (membership-checked daily & Monday–Sunday weekly leaderboards).
+  - `src/handlers/spa.ts` — Option B3 static SPA server reading from the private frontend S3 bucket with path-traversal guards, `/api/*` 404 isolation, MIME/binary handling, immutable caching for `/assets/*`, `no-store` for `index.html`/`config.json`, and extensionless SPA fallback to `index.html`.
 
 ### 3. `packages/frontend` (`@activity-racer/frontend`)
 - **Purpose:** Static Single Page Application built with React 19, Vite, and TypeScript.
@@ -89,6 +91,9 @@ npm install
 
 # Typecheck all packages (shared, backend, frontend, infra)
 npm run typecheck
+
+# Run unit tests
+npm run test
 
 # Run frontend locally (optionally set VITE_API_URL in packages/frontend/.env.local)
 npm run dev:frontend

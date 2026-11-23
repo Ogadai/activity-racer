@@ -13,6 +13,8 @@ export async function loadRuntimeConfig(): Promise<RuntimeConfig> {
     cachedConfig = {
       apiUrl: envApiUrl.replace(/\/+$/, ''),
       region: (import.meta.env.VITE_AWS_REGION as string | undefined) ?? 'eu-north-1',
+      userPoolId: import.meta.env.VITE_USER_POOL_ID as string | undefined,
+      userPoolClientId: import.meta.env.VITE_USER_POOL_CLIENT_ID as string | undefined,
     };
     return cachedConfig;
   }

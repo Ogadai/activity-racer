@@ -1,9 +1,11 @@
 import * as path from 'node:path';
 import * as cdk from 'aws-cdk-lib';
 import * as apigwv2 from 'aws-cdk-lib/aws-apigatewayv2';
+import * as authorizers from 'aws-cdk-lib/aws-apigatewayv2-authorizers';
 import * as integrations from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
+import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as nodejs from 'aws-cdk-lib/aws-lambda-nodejs';
@@ -34,28 +36,95 @@ export class ActivityRacerStack extends cdk.Stack {
       projectionType: dynamodb.ProjectionType.ALL,
     });
 
-    // 2. Phase 1 health-check Lambda (ARM64, Node.js 22, explicit LogGroup for clean teardown)
-    const healthLogGroup = new logs.LogGroup(this, 'HealthFunctionLogs', {
-      retention: logs.RetentionDays.ONE_WEEK,
+    // 2. Amazon Cognito User Pool + Public SPA Client
+    // Non-production dev exception: 8+ char password policy & MFA OFF for low-friction testing.
+    // Structured with mutable email & EMAIL_ONLY recovery for future Google federation ($0 SMS).
+    const userPool = new cognito.UserPool(this, 'ActivityRacerUserPool', {
+      userPoolName: 'activity-racer-users',
+      selfSignUpEnabled: true,
+      signInAliases: { email: true },
+      autoVerify: { email: true },
+      standardAttributes: {
+        email: { required: true, mutable: true },
+      },
+      passwordPolicy: {
+        minLength: 8,
+        requireLowercase: true,
+        requireUppercase: true,
+        requireDigits: true,
+        requireSymbols: false,
+      },
+      mfa: cognito.Mfa.OFF,
+      accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
-    const healthFn = new nodejs.NodejsFunction(this, 'HealthFunction', {
-      runtime: lambda.Runtime.NODEJS_22_X,
-      architecture: lambda.Architecture.ARM_64,
-      entry: path.join(__dirname, '../../backend/src/handlers/health.ts'),
-      handler: 'handler',
-      memorySize: 256,
-      timeout: cdk.Duration.seconds(10),
-      logGroup: healthLogGroup,
-      bundling: {
-        minify: true,
-        sourceMap: true,
-        forceDockerBundling: false,
+    const userPoolClient = userPool.addClient('ActivityRacerSpaClient', {
+      userPoolClientName: 'activity-racer-spa',
+      generateSecret: false, // Required for public browser SPA clients
+      authFlows: {
+        userSrp: true,
+        adminUserPassword: true, // IAM-only flow for CLI smoke testing
       },
+      enableTokenRevocation: true,
+      preventUserExistenceErrors: true,
+      accessTokenValidity: cdk.Duration.hours(1),
+      idTokenValidity: cdk.Duration.hours(1),
+      refreshTokenValidity: cdk.Duration.days(30),
     });
 
-    // 3. API Gateway HTTP API (backend API routes live under /api/* to avoid colliding with SPA routes)
+    // Helper to create consistent ARM64 Node.js 22 Lambdas with explicit 7-day LogGroups
+    const createApiLambda = (
+      idPrefix: string,
+      handlerFile: string,
+      environment?: Record<string, string>,
+    ): nodejs.NodejsFunction => {
+      const logGroup = new logs.LogGroup(this, `${idPrefix}FunctionLogs`, {
+        retention: logs.RetentionDays.ONE_WEEK,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      });
+
+      return new nodejs.NodejsFunction(this, `${idPrefix}Function`, {
+        runtime: lambda.Runtime.NODEJS_22_X,
+        architecture: lambda.Architecture.ARM_64,
+        entry: path.join(__dirname, '../../backend/src/handlers', handlerFile),
+        handler: 'handler',
+        memorySize: 256,
+        timeout: cdk.Duration.seconds(10),
+        logGroup,
+        environment,
+        bundling: {
+          minify: true,
+          sourceMap: true,
+          forceDockerBundling: false,
+        },
+      });
+    };
+
+    // 3. API Lambdas with least-privilege DynamoDB grants
+    const healthFn = createApiLambda('Health', 'health.ts');
+
+    const ingestStatsFn = createApiLambda('IngestStats', 'ingestStats.ts', {
+      TABLE_NAME: table.tableName,
+    });
+    table.grantReadWriteData(ingestStatsFn);
+
+    const playerFn = createApiLambda('Player', 'player.ts', {
+      TABLE_NAME: table.tableName,
+    });
+    table.grantReadWriteData(playerFn);
+
+    const groupsFn = createApiLambda('Groups', 'groups.ts', {
+      TABLE_NAME: table.tableName,
+    });
+    table.grantReadWriteData(groupsFn);
+
+    const raceFn = createApiLambda('Race', 'race.ts', {
+      TABLE_NAME: table.tableName,
+    });
+    table.grantReadData(raceFn);
+
+    // 4. API Gateway HTTP API + Built-in Cognito JWT Authorizer
     const httpApi = new apigwv2.HttpApi(this, 'ActivityRacerApi', {
       apiName: 'activity-racer-api',
       corsPreflight: {
@@ -66,20 +135,66 @@ export class ActivityRacerStack extends cdk.Stack {
           apigwv2.CorsHttpMethod.PUT,
           apigwv2.CorsHttpMethod.OPTIONS,
         ],
-        // Phase 1 walking skeleton allows all origins; tighten in Phase 2/3.
         allowOrigins: ['*'],
       },
     });
 
+    const jwtAuthorizer = new authorizers.HttpUserPoolAuthorizer(
+      'CognitoJwtAuthorizer',
+      userPool,
+      {
+        userPoolClients: [userPoolClient],
+      },
+    );
+
+    // Public routes
     httpApi.addRoutes({
       path: '/api/health',
       methods: [apigwv2.HttpMethod.GET],
       integration: new integrations.HttpLambdaIntegration('HealthIntegration', healthFn),
     });
 
+    // Home Assistant webhook (authenticated via per-player x-api-key header + playerSlug)
+    httpApi.addRoutes({
+      path: '/api/stats',
+      methods: [apigwv2.HttpMethod.POST],
+      integration: new integrations.HttpLambdaIntegration('IngestStatsIntegration', ingestStatsFn),
+    });
+
+    // Authenticated player & group routes (Cognito JWT Authorizer)
+    const playerIntegration = new integrations.HttpLambdaIntegration('PlayerIntegration', playerFn);
+    httpApi.addRoutes({
+      path: '/api/me',
+      methods: [apigwv2.HttpMethod.GET, apigwv2.HttpMethod.PUT],
+      integration: playerIntegration,
+      authorizer: jwtAuthorizer,
+    });
+
+    const groupsIntegration = new integrations.HttpLambdaIntegration('GroupsIntegration', groupsFn);
+    httpApi.addRoutes({
+      path: '/api/groups',
+      methods: [apigwv2.HttpMethod.GET, apigwv2.HttpMethod.POST],
+      integration: groupsIntegration,
+      authorizer: jwtAuthorizer,
+    });
+
+    httpApi.addRoutes({
+      path: '/api/groups/join',
+      methods: [apigwv2.HttpMethod.POST],
+      integration: groupsIntegration,
+      authorizer: jwtAuthorizer,
+    });
+
+    httpApi.addRoutes({
+      path: '/api/groups/{groupId}/race',
+      methods: [apigwv2.HttpMethod.GET],
+      integration: new integrations.HttpLambdaIntegration('RaceIntegration', raceFn),
+      authorizer: jwtAuthorizer,
+    });
+
     const apiBaseUrl = `${httpApi.apiEndpoint}/api`;
 
-    // 4. Static SPA hosting: always store assets in a private S3 bucket
+    // 5. Static SPA hosting: always store assets in a private S3 bucket
     const siteBucket = new s3.Bucket(this, 'FrontendBucket', {
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       encryption: s3.BucketEncryption.S3_MANAGED,
@@ -93,6 +208,8 @@ export class ActivityRacerStack extends cdk.Stack {
       s3deploy.Source.jsonData('config.json', {
         apiUrl: apiBaseUrl,
         region: this.region,
+        userPoolId: userPool.userPoolId,
+        userPoolClientId: userPoolClient.userPoolClientId,
         hostingMode: enableCloudFront ? 'cloudfront' : 'apigw-lambda-s3',
       }),
     ];
@@ -145,27 +262,8 @@ export class ActivityRacerStack extends cdk.Stack {
     } else {
       // Temporary Option B3 stand-in while CloudFront verification is pending:
       // Serve private S3 SPA assets over HTTPS through HTTP API Gateway + ARM64 Lambda.
-      const spaLogGroup = new logs.LogGroup(this, 'SpaHostingFunctionLogs', {
-        retention: logs.RetentionDays.ONE_WEEK,
-        removalPolicy: cdk.RemovalPolicy.DESTROY,
-      });
-
-      const spaFn = new nodejs.NodejsFunction(this, 'SpaHostingFunction', {
-        runtime: lambda.Runtime.NODEJS_22_X,
-        architecture: lambda.Architecture.ARM_64,
-        entry: path.join(__dirname, '../../backend/src/handlers/spa.ts'),
-        handler: 'handler',
-        memorySize: 256,
-        timeout: cdk.Duration.seconds(10),
-        logGroup: spaLogGroup,
-        environment: {
-          SITE_BUCKET_NAME: siteBucket.bucketName,
-        },
-        bundling: {
-          minify: true,
-          sourceMap: true,
-          forceDockerBundling: false,
-        },
+      const spaFn = createApiLambda('SpaHosting', 'spa.ts', {
+        SITE_BUCKET_NAME: siteBucket.bucketName,
       });
 
       siteBucket.grantRead(spaFn);
@@ -208,6 +306,16 @@ export class ActivityRacerStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'TableName', {
       value: table.tableName,
       description: 'DynamoDB single-table name',
+    });
+
+    new cdk.CfnOutput(this, 'UserPoolId', {
+      value: userPool.userPoolId,
+      description: 'Cognito User Pool ID',
+    });
+
+    new cdk.CfnOutput(this, 'UserPoolClientId', {
+      value: userPoolClient.userPoolClientId,
+      description: 'Cognito Public SPA User Pool Client ID',
     });
   }
 }

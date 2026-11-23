@@ -74,7 +74,8 @@ activity-racer/
 
 | Entity | `PK` | `SK` | `GSI1PK` | `GSI1SK` | Key Attributes |
 |---|---|---|---|---|---|
-| **Player Profile** | `USER#<cognitoSub>` | `PROFILE` | `SLUG#<playerSlug>` | `USER#<cognitoSub>` | `displayName`, `playerSlug`, `bikeColor`, `dailyStepTarget` (default `10000`), `dailyCalorieTarget` (default `500`), `stepWeight` (`0.5`), `calorieWeight` (`0.5`), `createdAt` |
+| **Player Profile** | `USER#<cognitoSub>` | `PROFILE` | `SLUG#<playerSlug>` | `USER#<cognitoSub>` | `displayName`, `playerSlug`, `bikeColor`, `dailyStepTarget` (default `10000`), `dailyCalorieTarget` (default `500`), `stepWeight` (`0.5`), `calorieWeight` (`0.5`), `webhookApiKey`, `createdAt`, `updatedAt` |
+| **Uniqueness Lock** | `SLUG#<playerSlug>` / `INVITE#<inviteCode>` | `UNIQUE` | — | — | Atomic `TransactWriteItems` uniqueness guard for `playerSlug` and `inviteCode` |
 | **Group** | `GROUP#<groupId>` | `META` | `INVITE#<inviteCode>` | `GROUP#<groupId>` | `groupId`, `name`, `inviteCode`, `createdBy`, `createdAt` |
 | **Membership** | `GROUP#<groupId>` | `MEMBER#<cognitoSub>` | `USER#<cognitoSub>` | `GROUP#<groupId>` | `role` (`OWNER` \| `MEMBER`), `joinedAt` |
 | **Daily Stat** | `USER#<cognitoSub>` | `STAT#<YYYY-MM-DD>` | — | — | `date`, `steps`, `activeCalories`, `updatedAt`, `source` |
@@ -84,7 +85,7 @@ activity-racer/
   - `stepPct = steps / dailyStepTarget`
   - `calPct = activeCalories / dailyCalorieTarget`
   - `weightedScorePct = (stepWeight * stepPct + calorieWeight * calPct) * 100`
-- Weekly view aggregates each player's daily weighted scores across the 7-day window so personal targets remain fairly normalized day-by-day.
+- Weekly view uses the Monday–Sunday calendar week containing `date`, summing each player's daily weighted scores across the 7 days and dividing by `7` (missing days count as `0%`) so the race resets every Monday and builds toward 100% by Sunday.
 
 ---
 
@@ -105,15 +106,15 @@ activity-racer/
 - [ ] Run `cdk destroy` to verify clean zero-leftover teardown
 
 ### Phase 2: Cognito Auth, Data Model & API
-- [ ] Add Cognito User Pool (email/password; structured for Google federation later) + public SPA User Pool Client in CDK; expose IDs in `config.json`
-- [ ] Attach API Gateway HTTP API JWT Authorizer (`HttpUserPoolAuthorizer`) to authenticated routes
-- [ ] Implement shared domain types & weighted scoring logic + unit tests in `packages/shared`
-- [ ] Implement Lambda endpoints:
-  - `POST /stats` (`x-api-key` protected Home Assistant webhook)
-  - `GET /me`, `PUT /me` (player profile, targets, weighting, `playerSlug`)
-  - `POST /groups`, `POST /groups/join`, `GET /groups`
-  - `GET /groups/{groupId}/race?range=daily|weekly&date=YYYY-MM-DD`
-- [ ] Deploy and verify endpoints (including simulated Home Assistant `POST /stats`)
+- [x] Add Cognito User Pool (email/password; structured for Google federation later) + public SPA User Pool Client in CDK; expose IDs in `config.json`
+- [x] Attach API Gateway HTTP API JWT Authorizer (`HttpUserPoolAuthorizer`) to authenticated routes
+- [x] Implement shared domain types & weighted scoring logic + unit tests in `packages/shared`
+- [x] Implement Lambda endpoints:
+  - `POST /api/stats` (per-player `x-api-key` + `playerSlug` protected Home Assistant webhook)
+  - `GET /api/me`, `PUT /api/me` (player profile, targets, weighting, `playerSlug`, per-player `webhookApiKey` rotation)
+  - `POST /api/groups`, `POST /api/groups/join`, `GET /api/groups`
+  - `GET /api/groups/{groupId}/race?range=daily|weekly&date=YYYY-MM-DD`
+- [x] Deploy and verify endpoints (including simulated Home Assistant `POST /api/stats`)
 
 ### Phase 3: Frontend Auth, Routing & Group Management
 - [ ] Integrate Cognito sign-up, email confirmation, sign-in, sign-out, and protected routes

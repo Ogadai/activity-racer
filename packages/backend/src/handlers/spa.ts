@@ -95,6 +95,15 @@ export const handler = async (
     return { statusCode: 400, body: 'Invalid path' };
   }
 
+  // Never fall back to index.html for unmatched /api/* routes
+  if (rawPath === '/api' || rawPath.startsWith('/api/')) {
+    return {
+      statusCode: 404,
+      headers: { 'content-type': 'application/json; charset=utf-8' },
+      body: JSON.stringify({ error: 'API route not found.' }),
+    };
+  }
+
   const trimmed = rawPath.replace(/^\/+/, '');
   const requestedKey = trimmed === '' ? 'index.html' : trimmed;
 

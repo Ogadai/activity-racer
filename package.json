@@ -9,6 +9,7 @@
     "dev:frontend": "npm --workspace=@activity-racer/frontend run dev",
     "build:frontend": "npm --workspace=@activity-racer/frontend run build",
     "typecheck": "npm --workspaces --if-present run typecheck",
+    "test": "npm --workspaces --if-present run test",
     "cdk:synth": "npm run build:frontend && npm --workspace=@activity-racer/infra run cdk -- synth",
     "cdk:diff": "npm run build:frontend && npm --workspace=@activity-racer/infra run cdk -- diff",
     "cdk:deploy": "npm run build:frontend && npm --workspace=@activity-racer/infra run cdk -- deploy",
