@@ -100,8 +100,8 @@ activity-racer/
   - Private S3 bucket (`RemovalPolicy.DESTROY`, `autoDeleteObjects: true`) + feature-flagged CloudFront OAC (`-c enableCloudFront=true` once AWS Support unlocks CloudFront) with temporary Option B3 HTTPS SPA Lambda hosting (`GET /` and `GET /{proxy+}`)
   - `BucketDeployment` uploading built `frontend/dist` + runtime `config.json`
 - [x] Build frontend and validate with `cdk synth`
-- [ ] Run `cdk bootstrap` (if needed in `eu-north-1`) and `cdk deploy`
-- [ ] Verify live CloudFront URL renders placeholder app and displays live `GET /health` response
+- [x] Run `cdk bootstrap` (if needed in `eu-north-1`) and `cdk deploy`
+- [x] Verify live URL renders placeholder app and displays live `GET /api/health` response
 - [ ] Run `cdk destroy` to verify clean zero-leftover teardown
 
 ### Phase 2: Cognito Auth, Data Model & API
