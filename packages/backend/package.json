@@ -7,7 +7,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@activity-racer/shared": "*"
+    "@activity-racer/shared": "*",
+    "@aws-sdk/client-s3": "^3.750.0"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.148"

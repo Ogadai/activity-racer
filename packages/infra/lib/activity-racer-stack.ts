@@ -16,6 +16,9 @@ export class ActivityRacerStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
+    // Toggle CloudFront via `-c enableCloudFront=true` once AWS Support unlocks CloudFront
+    const enableCloudFront = this.node.tryGetContext('enableCloudFront') === 'true';
+
     // 1. Single-table DynamoDB store (on-demand, zero idle cost, clean dev teardown)
     const table = new dynamodb.Table(this, 'ActivityRacerTable', {
       partitionKey: { name: 'PK', type: dynamodb.AttributeType.STRING },
@@ -52,7 +55,7 @@ export class ActivityRacerStack extends cdk.Stack {
       },
     });
 
-    // 3. API Gateway HTTP API (cheaper and simpler than REST API)
+    // 3. API Gateway HTTP API (backend API routes live under /api/* to avoid colliding with SPA routes)
     const httpApi = new apigwv2.HttpApi(this, 'ActivityRacerApi', {
       apiName: 'activity-racer-api',
       corsPreflight: {
@@ -63,18 +66,20 @@ export class ActivityRacerStack extends cdk.Stack {
           apigwv2.CorsHttpMethod.PUT,
           apigwv2.CorsHttpMethod.OPTIONS,
         ],
-        // Phase 1 walking skeleton allows all origins; we can restrict to CloudFront + localhost in Phase 2/3.
+        // Phase 1 walking skeleton allows all origins; tighten in Phase 2/3.
         allowOrigins: ['*'],
       },
     });
 
     httpApi.addRoutes({
-      path: '/health',
+      path: '/api/health',
       methods: [apigwv2.HttpMethod.GET],
       integration: new integrations.HttpLambdaIntegration('HealthIntegration', healthFn),
     });
 
-    // 4. Static SPA hosting: Private S3 bucket + CloudFront OAC (no Lambda@Edge)
+    const apiBaseUrl = `${httpApi.apiEndpoint}/api`;
+
+    // 4. Static SPA hosting: always store assets in a private S3 bucket
     const siteBucket = new s3.Bucket(this, 'FrontendBucket', {
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       encryption: s3.BucketEncryption.S3_MANAGED,
@@ -83,63 +88,121 @@ export class ActivityRacerStack extends cdk.Stack {
       autoDeleteObjects: true,
     });
 
-    const s3Origin = origins.S3BucketOrigin.withOriginAccessControl(siteBucket);
+    const deploySources: s3deploy.ISource[] = [
+      s3deploy.Source.asset(path.join(__dirname, '../../frontend/dist')),
+      s3deploy.Source.jsonData('config.json', {
+        apiUrl: apiBaseUrl,
+        region: this.region,
+        hostingMode: enableCloudFront ? 'cloudfront' : 'apigw-lambda-s3',
+      }),
+    ];
 
-    const distribution = new cloudfront.Distribution(this, 'FrontendDistribution', {
-      comment: 'Activity Racer SPA distribution',
-      defaultRootObject: 'index.html',
-      defaultBehavior: {
-        origin: s3Origin,
-        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-        cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
-      },
-      additionalBehaviors: {
-        '/config.json': {
+    let frontendUrl: string;
+
+    if (enableCloudFront) {
+      // Production-preferred path: CloudFront OAC in front of private S3 (no Lambda@Edge)
+      const s3Origin = origins.S3BucketOrigin.withOriginAccessControl(siteBucket);
+
+      const distribution = new cloudfront.Distribution(this, 'FrontendDistribution', {
+        comment: 'Activity Racer SPA distribution',
+        defaultRootObject: 'index.html',
+        defaultBehavior: {
           origin: s3Origin,
           viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-          cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+          cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
         },
-      },
-      // SPA client-side routing fallback for React Router without using Lambda@Edge
-      errorResponses: [
-        {
-          httpStatus: 403,
-          responseHttpStatus: 200,
-          responsePagePath: '/index.html',
-          ttl: cdk.Duration.seconds(0),
+        additionalBehaviors: {
+          '/config.json': {
+            origin: s3Origin,
+            viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+            cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+          },
         },
-        {
-          httpStatus: 404,
-          responseHttpStatus: 200,
-          responsePagePath: '/index.html',
-          ttl: cdk.Duration.seconds(0),
-        },
-      ],
-    });
+        errorResponses: [
+          {
+            httpStatus: 403,
+            responseHttpStatus: 200,
+            responsePagePath: '/index.html',
+            ttl: cdk.Duration.seconds(0),
+          },
+          {
+            httpStatus: 404,
+            responseHttpStatus: 200,
+            responsePagePath: '/index.html',
+            ttl: cdk.Duration.seconds(0),
+          },
+        ],
+      });
 
-    // Deploy Vite build + runtime config.json to S3 and invalidate entrypoints
-    new s3deploy.BucketDeployment(this, 'DeployFrontend', {
-      sources: [
-        s3deploy.Source.asset(path.join(__dirname, '../../frontend/dist')),
-        s3deploy.Source.jsonData('config.json', {
-          apiUrl: httpApi.apiEndpoint,
-          region: this.region,
-        }),
-      ],
-      destinationBucket: siteBucket,
-      distribution,
-      distributionPaths: ['/index.html', '/config.json'],
-    });
+      new s3deploy.BucketDeployment(this, 'DeployFrontend', {
+        sources: deploySources,
+        destinationBucket: siteBucket,
+        distribution,
+        distributionPaths: ['/index.html', '/config.json'],
+      });
+
+      frontendUrl = `https://${distribution.distributionDomainName}`;
+    } else {
+      // Temporary Option B3 stand-in while CloudFront verification is pending:
+      // Serve private S3 SPA assets over HTTPS through HTTP API Gateway + ARM64 Lambda.
+      const spaLogGroup = new logs.LogGroup(this, 'SpaHostingFunctionLogs', {
+        retention: logs.RetentionDays.ONE_WEEK,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      });
+
+      const spaFn = new nodejs.NodejsFunction(this, 'SpaHostingFunction', {
+        runtime: lambda.Runtime.NODEJS_22_X,
+        architecture: lambda.Architecture.ARM_64,
+        entry: path.join(__dirname, '../../backend/src/handlers/spa.ts'),
+        handler: 'handler',
+        memorySize: 256,
+        timeout: cdk.Duration.seconds(10),
+        logGroup: spaLogGroup,
+        environment: {
+          SITE_BUCKET_NAME: siteBucket.bucketName,
+        },
+        bundling: {
+          minify: true,
+          sourceMap: true,
+          forceDockerBundling: false,
+        },
+      });
+
+      siteBucket.grantRead(spaFn);
+
+      const spaIntegration = new integrations.HttpLambdaIntegration('SpaIntegration', spaFn);
+
+      httpApi.addRoutes({
+        path: '/',
+        methods: [apigwv2.HttpMethod.GET],
+        integration: spaIntegration,
+      });
+
+      httpApi.addRoutes({
+        path: '/{proxy+}',
+        methods: [apigwv2.HttpMethod.GET],
+        integration: spaIntegration,
+      });
+
+      new s3deploy.BucketDeployment(this, 'DeployFrontend', {
+        sources: deploySources,
+        destinationBucket: siteBucket,
+      });
+
+      frontendUrl = httpApi.apiEndpoint;
+    }
 
     // Stack outputs
     new cdk.CfnOutput(this, 'FrontendUrl', {
-      value: `https://${distribution.distributionDomainName}`,
-      description: 'CloudFront URL for the Activity Racer frontend',
+      value: frontendUrl,
+      description: enableCloudFront
+        ? 'CloudFront URL for the Activity Racer frontend'
+        : 'HTTPS API Gateway URL serving the Activity Racer SPA (Option B3)',
     });
 
     new cdk.CfnOutput(this, 'ApiUrl', {
-      value: httpApi.apiEndpoint,
-      description: 'HTTP API Gateway base URL',
+      value: apiBaseUrl,
+      description: 'HTTP API Gateway base URL for /api/* routes',
     });
 
     new cdk.CfnOutput(this, 'TableName', {

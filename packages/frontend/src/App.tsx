@@ -38,7 +38,7 @@ export function App() {
         <span className="badge">Phase 1 · Walking Skeleton</span>
         <h1>Activity Racer</h1>
         <p className="subtitle">
-          End-to-end check: CloudFront + S3 → API Gateway HTTP API → AWS Lambda
+          End-to-end check: Private S3 SPA → HTTPS API Gateway → AWS Lambda
         </p>
 
         {state.status === 'loading' && (
@@ -57,6 +57,12 @@ export function App() {
                 <dt>Region</dt>
                 <dd>{state.health.region}</dd>
               </div>
+              {state.config.hostingMode && (
+                <div>
+                  <dt>SPA Hosting</dt>
+                  <dd>{state.config.hostingMode}</dd>
+                </div>
+              )}
               <div>
                 <dt>API Endpoint</dt>
                 <dd>{state.config.apiUrl}</dd>

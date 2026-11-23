@@ -8,4 +8,5 @@ export interface HealthResponse {
 export interface RuntimeConfig {
   apiUrl: string;
   region: string;
+  hostingMode?: 'cloudfront' | 'apigw-lambda-s3';
 }

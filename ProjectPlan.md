@@ -96,8 +96,8 @@ activity-racer/
 - [x] Scaffold `packages/shared`, `packages/backend` (`GET /health`), `packages/frontend` (Vite + React placeholder), and `packages/infra` (CDK TypeScript stack)
 - [x] CDK stack provisions:
   - DynamoDB table (`PK`/`SK` + `GSI1`, `RemovalPolicy.DESTROY`)
-  - API Gateway HTTP API + `GET /health` Lambda (`NODEJS_22_X`, `ARM_64`, explicit LogGroup with `RemovalPolicy.DESTROY`)
-  - Private S3 bucket (`RemovalPolicy.DESTROY`, `autoDeleteObjects: true`) + CloudFront OAC distribution (403/404 -> `/index.html` HTTP 200 for SPA routing; no Lambda@Edge)
+  - API Gateway HTTP API (`/api/*` backend routes to prevent collisions with React Router paths) + `GET /api/health` Lambda (`NODEJS_22_X`, `ARM_64`, explicit LogGroup with `RemovalPolicy.DESTROY`)
+  - Private S3 bucket (`RemovalPolicy.DESTROY`, `autoDeleteObjects: true`) + feature-flagged CloudFront OAC (`-c enableCloudFront=true` once AWS Support unlocks CloudFront) with temporary Option B3 HTTPS SPA Lambda hosting (`GET /` and `GET /{proxy+}`)
   - `BucketDeployment` uploading built `frontend/dist` + runtime `config.json`
 - [x] Build frontend and validate with `cdk synth`
 - [ ] Run `cdk bootstrap` (if needed in `eu-north-1`) and `cdk deploy`
