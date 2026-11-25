@@ -230,25 +230,29 @@ export function createCyclistRig(userId: string, initialColor: string): CyclistR
     leanGroup.add(createTubeMesh(dropStart, dropEnd, 0.009, carbonMat));
   }
 
-  // --- Rider Upper Body (aero tuck) ---
-  const hips = new THREE.Mesh(new THREE.BoxGeometry(0.145, 0.08, 0.11), bibMat);
-  hips.position.set(0, 0.445, -0.105);
+  // --- Rider Upper Body (rounded aero tuck matching tubular limbs) ---
+  const hips = new THREE.Mesh(new THREE.CapsuleGeometry(0.052, 0.058, 6, 12), bibMat);
+  hips.rotation.z = Math.PI / 2;
+  hips.scale.set(0.85, 1, 1.08);
+  hips.position.set(0, 0.44, -0.102);
   hips.castShadow = true;
   leanGroup.add(hips);
 
   const torsoGroup = new THREE.Group();
-  torsoGroup.position.set(0, 0.46, -0.09);
+  torsoGroup.position.set(0, 0.455, -0.09);
   torsoGroup.rotation.x = 0.86; // Aero forward lean toward bars
   leanGroup.add(torsoGroup);
 
-  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.165, 0.25, 0.105), jerseyMat);
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.076, 0.135, 8, 14), jerseyMat);
+  torso.scale.set(1.08, 1, 0.72);
   torso.position.set(0, 0.125, 0);
   torso.castShadow = true;
   torsoGroup.add(torso);
 
-  // Crisp jersey racing stripe for high visibility from top-down camera
-  const backStripe = new THREE.Mesh(new THREE.BoxGeometry(0.042, 0.23, 0.112), stripeMat);
-  backStripe.position.set(0, 0.125, 0);
+  // Contoured jersey racing stripe along the rounded back (local -Z faces up/back)
+  const backStripe = new THREE.Mesh(new THREE.CapsuleGeometry(0.022, 0.13, 6, 10), stripeMat);
+  backStripe.scale.set(1, 1, 0.45);
+  backStripe.position.set(0, 0.125, -0.049);
   torsoGroup.add(backStripe);
 
   // Head + Aero Helmet positioned at shoulder/neck tip
@@ -268,12 +272,17 @@ export function createCyclistRig(userId: string, initialColor: string): CyclistR
   visor.position.set(0, 0.658, 0.175);
   leanGroup.add(visor);
 
-  // Arms reaching from shoulders to handlebars
+  // Rounded shoulders + arms reaching to handlebars
+  const shoulderGeo = new THREE.SphereGeometry(0.034, 8, 8);
   for (const side of [-1, 1]) {
-    const shoulder = new THREE.Vector3(side * 0.095, 0.59, 0.06);
+    const shoulder = new THREE.Vector3(side * 0.088, 0.59, 0.058);
     const elbow = new THREE.Vector3(side * 0.11, 0.495, 0.135);
     const hand = new THREE.Vector3(side * 0.115, 0.425, 0.21);
+    const shoulderCap = new THREE.Mesh(shoulderGeo, jerseyMat);
+    shoulderCap.position.copy(shoulder);
+    shoulderCap.castShadow = true;
     leanGroup.add(
+      shoulderCap,
       createTubeMesh(shoulder, elbow, 0.024, jerseyMat),
       createTubeMesh(elbow, hand, 0.02, skinMat),
     );
