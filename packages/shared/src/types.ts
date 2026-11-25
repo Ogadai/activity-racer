@@ -15,6 +15,7 @@ export interface RuntimeConfig {
   callbackPath?: string;
   logoutPath?: string;
   hostingMode?: 'cloudfront' | 'apigw-lambda-s3';
+  aiCommentaryEnabled?: boolean;
 }
 
 export interface ScoringTargets {
@@ -138,6 +139,25 @@ export interface RaceResponse {
   endDate: string;
   standings: RaceStanding[];
   generatedAt: string;
+}
+
+export interface RaceCommentaryDay {
+  date: string;
+  dayLabel: string;
+  commentary: string;
+}
+
+export interface RaceCommentaryResponse {
+  groupId: string;
+  range: RaceRange;
+  startDate: string;
+  endDate: string;
+  headline: string;
+  days: RaceCommentaryDay[];
+  summary: string;
+  model: string;
+  generatedAt: string;
+  cached: boolean;
 }
 
 export interface ApiErrorResponse {

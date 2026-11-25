@@ -14,6 +14,8 @@ import {
   DEFAULT_STEP_WEIGHT,
   type GroupRole,
   type PlayerProfile,
+  type RaceCommentaryDay,
+  type RaceRange,
 } from '@activity-racer/shared';
 import { generateWebhookApiKey } from './auth';
 
@@ -45,6 +47,7 @@ export const keys = {
   inviteLockPk: (inviteCode: string) => `INVITE#${inviteCode}`,
   memberSk: (userId: string) => `MEMBER#${userId}`,
   statSk: (date: string) => `STAT#${date}`,
+  commentarySk: (range: RaceRange, startDate: string) => `COMMENTARY#${range}#${startDate}`,
 };
 
 export interface PlayerProfileItem {
@@ -101,6 +104,22 @@ export interface DailyStatItem {
   activeCalories: number;
   updatedAt: string;
   source: string;
+}
+
+export interface RaceCommentaryItem {
+  PK: string;
+  SK: string;
+  entityType: 'RACE_COMMENTARY';
+  groupId: string;
+  range: RaceRange;
+  startDate: string;
+  endDate: string;
+  dataHash: string;
+  headline: string;
+  days: RaceCommentaryDay[];
+  summary: string;
+  model: string;
+  generatedAt: string;
 }
 
 export function toPlayerProfile(item: PlayerProfileItem): PlayerProfile {

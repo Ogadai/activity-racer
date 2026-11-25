@@ -6,6 +6,7 @@ import type {
   HealthResponse,
   JoinGroupRequest,
   PlayerProfile,
+  RaceCommentaryResponse,
   RaceRange,
   RaceResponse,
   UpdatePlayerProfileRequest,
@@ -19,6 +20,8 @@ export const queryKeys = {
   groups: ['groups'] as const,
   race: (groupId: string, range: RaceRange, date: string) =>
     ['race', groupId, range, date] as const,
+  commentary: (groupId: string, range: RaceRange, startDate: string) =>
+    ['commentary', groupId, range, startDate] as const,
 };
 
 export function useHealth() {
@@ -118,5 +121,32 @@ export function useRace(groupId: string | undefined, range: RaceRange, date: str
     enabled: status === 'authenticated' && Boolean(groupId),
     refetchInterval: 30_000,
     refetchIntervalInBackground: false,
+  });
+}
+
+export function useRaceCommentary(
+  groupId: string | undefined,
+  range: RaceRange,
+  anchorDate: string,
+  startDate: string | undefined,
+  enabled: boolean,
+) {
+  const { status, getValidToken } = useAuth();
+  return useQuery({
+    queryKey: queryKeys.commentary(groupId ?? '', range, startDate ?? anchorDate),
+    queryFn: ({ signal }) => {
+      const qs = new URLSearchParams({ range, date: anchorDate }).toString();
+      return apiRequest<RaceCommentaryResponse>(
+        `/groups/${encodeURIComponent(groupId!)}/commentary?${qs}`,
+        {
+          getToken: getValidToken,
+          signal,
+        },
+      );
+    },
+    enabled: status === 'authenticated' && Boolean(groupId) && Boolean(startDate) && enabled,
+    staleTime: 5 * 60 * 1000, // 5-minute client cache aligned with server cooldown
+    refetchOnWindowFocus: false,
+    retry: false,
   });
 }

@@ -1,7 +1,7 @@
 import { Fragment, Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { getTodayIsoDate, type RaceRange, type RaceStanding } from '@activity-racer/shared';
-import { useGroups, useRace } from '../api/queries';
+import { useGroups, useRace, useRaceCommentary } from '../api/queries';
 import {
   ChevronDownIcon,
   FlameIcon,
@@ -14,6 +14,7 @@ import {
   PlaybackControls,
   type PlaybackSpeed,
 } from '../components/PlaybackControls';
+import { RaceCommentaryTicker } from '../components/RaceCommentaryTicker';
 import type { CameraMode } from '../components/VelodromeRace3D';
 import {
   buildRaceTimeline,
@@ -44,12 +45,16 @@ interface PlaybackPreferences {
   cameraMode: CameraMode;
   showLabels: boolean;
   speed: PlaybackSpeed;
+  commentaryEnabled: boolean;
+  ttsEnabled: boolean;
 }
 
 const DEFAULT_PLAYBACK_PREFS: PlaybackPreferences = {
   cameraMode: 'stadium',
   showLabels: true,
   speed: 1,
+  commentaryEnabled: true,
+  ttsEnabled: false,
 };
 
 function loadPlaybackPreferences(): PlaybackPreferences {
@@ -72,7 +77,15 @@ function loadPlaybackPreferences(): PlaybackPreferences {
     const speed = PLAYBACK_SPEEDS.includes(parsed.speed as PlaybackSpeed)
       ? (parsed.speed as PlaybackSpeed)
       : DEFAULT_PLAYBACK_PREFS.speed;
-    return { cameraMode, showLabels, speed };
+    const commentaryEnabled =
+      typeof parsed.commentaryEnabled === 'boolean'
+        ? parsed.commentaryEnabled
+        : DEFAULT_PLAYBACK_PREFS.commentaryEnabled;
+    const ttsEnabled =
+      typeof parsed.ttsEnabled === 'boolean'
+        ? parsed.ttsEnabled
+        : DEFAULT_PLAYBACK_PREFS.ttsEnabled;
+    return { cameraMode, showLabels, speed, commentaryEnabled, ttsEnabled };
   } catch {
     return DEFAULT_PLAYBACK_PREFS;
   }
@@ -261,14 +274,18 @@ export function RacePage() {
   const [cameraMode, setCameraMode] = useState<CameraMode>(initialPrefs.cameraMode);
   const [showLabels, setShowLabels] = useState<boolean>(initialPrefs.showLabels);
   const [speed, setSpeed] = useState<PlaybackSpeed>(initialPrefs.speed);
+  const [commentaryEnabled, setCommentaryEnabled] = useState<boolean>(
+    initialPrefs.commentaryEnabled,
+  );
+  const [ttsEnabled, setTtsEnabled] = useState<boolean>(initialPrefs.ttsEnabled);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [uiTimelineT, setUiTimelineT] = useState<number>(0);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
 
-  // Persist user's playback & camera preferences across reloads
+  // Persist user's playback, camera, and announcer preferences across reloads
   useEffect(() => {
-    savePlaybackPreferences({ cameraMode, showLabels, speed });
-  }, [cameraMode, showLabels, speed]);
+    savePlaybackPreferences({ cameraMode, showLabels, speed, commentaryEnabled, ttsEnabled });
+  }, [cameraMode, showLabels, speed, commentaryEnabled, ttsEnabled]);
 
   // Refs shared with the 60fps Three.js render loop to avoid per-frame React re-renders
   const timelineTRef = useRef<number>(0);
@@ -295,6 +312,14 @@ export function RacePage() {
 
   const raceQuery = useRace(activeGroupId, range, date);
   const raceData = raceQuery.data;
+
+  const commentaryQuery = useRaceCommentary(
+    activeGroupId,
+    range,
+    date,
+    raceData?.startDate,
+    commentaryEnabled && Boolean(raceData),
+  );
 
   // Build stable timeline only when actual race scores/structure change (polling-safe)
   const raceIdentity = raceData ? computeRaceIdentity(raceData) : null;
@@ -609,6 +634,23 @@ export function RacePage() {
                     onToggleLabels={() => setShowLabels((v) => !v)}
                   />
                 </Suspense>
+
+                <RaceCommentaryTicker
+                  enabled={commentaryEnabled}
+                  ttsEnabled={ttsEnabled}
+                  isPlaying={isPlaying}
+                  activeDayDate={uiFrame.activeDay.date}
+                  activeDayShortLabel={uiFrame.activeDay.shortLabel}
+                  isFinalDay={
+                    raceData.range === 'daily' ||
+                    uiFrame.activeDayIndex === timeline.days.length - 1
+                  }
+                  data={commentaryQuery.data}
+                  isPending={commentaryQuery.isPending}
+                  error={commentaryQuery.error}
+                  onToggleEnabled={() => setCommentaryEnabled((v) => !v)}
+                  onToggleTts={() => setTtsEnabled((v) => !v)}
+                />
 
                 <PlaybackControls
                   timeline={timeline}

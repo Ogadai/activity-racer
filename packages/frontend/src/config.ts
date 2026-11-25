@@ -21,6 +21,8 @@ export async function loadRuntimeConfig(): Promise<RuntimeConfig> {
       googleAuthEnabled: envGoogleEnabled === 'true',
       callbackPath: '/auth/callback',
       logoutPath: '/login',
+      aiCommentaryEnabled:
+        (import.meta.env.VITE_AI_COMMENTARY_ENABLED as string | undefined) !== 'false',
     };
     return cachedConfig;
   }

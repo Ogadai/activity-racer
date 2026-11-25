@@ -10,6 +10,7 @@
     "@activity-racer/shared": "*",
     "@aws-sdk/client-dynamodb": "^3.750.0",
     "@aws-sdk/client-s3": "^3.750.0",
+    "@aws-sdk/client-ssm": "^3.1177.0",
     "@aws-sdk/lib-dynamodb": "^3.750.0"
   },
   "devDependencies": {
