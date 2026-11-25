@@ -11,8 +11,8 @@ export const TRACK_PLANE_WIDTH = 16;
 export const TRACK_PLANE_HEIGHT = TRACK_PLANE_WIDTH * (TRACK_IMAGE_HEIGHT / TRACK_IMAGE_WIDTH);
 export const TRACK_UNITS_PER_PX = TRACK_PLANE_WIDTH / TRACK_IMAGE_WIDTH;
 
-export const DAILY_BASE_DURATION_SEC = 4.0;
-export const WEEKLY_DAY_DURATION_SEC = 2.5;
+export const DAILY_BASE_DURATION_SEC = 8.0;
+export const WEEKLY_DAY_DURATION_SEC = 5.0;
 
 export interface TrackConfig {
   /** World X center of the oval */

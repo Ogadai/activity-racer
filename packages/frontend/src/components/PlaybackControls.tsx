@@ -43,7 +43,15 @@ export function PlaybackControls({
             {frame.activeDay?.fullLabel ?? (timeline.range === 'weekly' ? 'Weekly' : 'Daily')}
           </span>
           <span className="hud-state-tag">
-            {isPlaying ? 'Live' : waitingForCommentary ? 'Waiting' : isAtFinish ? 'Finish' : 'Paused'}
+            {isPlaying
+              ? 'Live'
+              : waitingForCommentary
+                ? 'Loading'
+                : isAtFinish
+                  ? 'Finish'
+                  : frame.t <= 0.001
+                    ? 'Ready'
+                    : 'Paused'}
           </span>
         </div>
 

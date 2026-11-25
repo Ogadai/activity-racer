@@ -14,6 +14,8 @@ import {
   LabelIcon,
   LabelOffIcon,
   MyLocationIcon,
+  PlayIcon,
+  ReplayIcon,
   StadiumIcon,
   TopDownIcon,
   TrophyIcon,
@@ -30,6 +32,8 @@ interface VelodromeRace3DProps {
   cameraMode: CameraMode;
   showLabels: boolean;
   hasCurrentUser: boolean;
+  playOverlayMode: 'hidden' | 'play' | 'replay' | 'loading';
+  onPlayOverlayClick: () => void;
   onCameraModeChange: (mode: CameraMode) => void;
   onToggleLabels: () => void;
 }
@@ -62,6 +66,8 @@ export default function VelodromeRace3D({
   cameraMode,
   showLabels,
   hasCurrentUser,
+  playOverlayMode,
+  onPlayOverlayClick,
   onCameraModeChange,
   onToggleLabels,
 }: VelodromeRace3DProps) {
@@ -582,6 +588,38 @@ export default function VelodromeRace3D({
             </div>
           ))}
         </div>
+
+        {playOverlayMode !== 'hidden' && (
+          <div className="velodrome-play-backdrop">
+            <button
+              type="button"
+              className={`velodrome-play-btn${playOverlayMode === 'loading' ? ' loading' : ''}`}
+              onClick={onPlayOverlayClick}
+              aria-label={
+                playOverlayMode === 'replay'
+                  ? 'Replay race animation'
+                  : playOverlayMode === 'loading'
+                    ? 'Start race now while commentary loads'
+                    : 'Play race animation'
+              }
+            >
+              {playOverlayMode === 'loading' ? (
+                <span className="play-overlay-spinner" aria-hidden="true" />
+              ) : playOverlayMode === 'replay' ? (
+                <ReplayIcon size={38} />
+              ) : (
+                <PlayIcon size={42} />
+              )}
+              <span className="velodrome-play-caption">
+                {playOverlayMode === 'loading'
+                  ? 'Loading...'
+                  : playOverlayMode === 'replay'
+                    ? 'Replay'
+                    : 'Start Race'}
+              </span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

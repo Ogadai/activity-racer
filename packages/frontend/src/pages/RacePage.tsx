@@ -1,6 +1,11 @@
 import { Fragment, Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { getTodayIsoDate, type RaceRange, type RaceStanding } from '@activity-racer/shared';
+import {
+  getTodayIsoDate,
+  isValidIsoDate,
+  type RaceRange,
+  type RaceStanding,
+} from '@activity-racer/shared';
 import { useGroups, useRace, useRaceCommentary } from '../api/queries';
 import {
   ChevronDownIcon,
@@ -14,7 +19,10 @@ import {
   PlaybackControls,
   type PlaybackSpeed,
 } from '../components/PlaybackControls';
-import { RaceCommentaryTicker } from '../components/RaceCommentaryTicker';
+import {
+  RaceCommentaryTicker,
+  buildCommentarySpeakKey,
+} from '../components/RaceCommentaryTicker';
 import type { CameraMode } from '../components/VelodromeRace3D';
 import {
   buildRaceTimeline,
@@ -24,6 +32,7 @@ import {
   sampleRaceTimeline,
   type RaceTimeline,
 } from '../race/trackMath';
+import { cancelSpeech, speakText } from '../race/tts';
 
 const VelodromeRace3D = lazy(() => import('../components/VelodromeRace3D'));
 
@@ -40,21 +49,34 @@ function formatTime(timestamp: number | string | null): string {
 
 const PLAYBACK_PREFS_STORAGE_KEY = 'activity-racer:playback-prefs';
 const VALID_CAMERA_MODES: readonly CameraMode[] = ['stadium', 'top', 'leader', 'me'];
+const VALID_RANGES: readonly RaceRange[] = ['daily', 'weekly'];
+
+type DateSelectionMode = 'today' | 'custom';
 
 interface PlaybackPreferences {
+  groupId: string | null;
+  range: RaceRange;
+  dateMode: DateSelectionMode;
+  customDate: string | null;
   cameraMode: CameraMode;
   showLabels: boolean;
   speed: PlaybackSpeed;
   commentaryEnabled: boolean;
   ttsEnabled: boolean;
+  ttsVoiceUri: string | null;
 }
 
 const DEFAULT_PLAYBACK_PREFS: PlaybackPreferences = {
+  groupId: null,
+  range: 'daily',
+  dateMode: 'today',
+  customDate: null,
   cameraMode: 'stadium',
   showLabels: true,
   speed: 1,
   commentaryEnabled: true,
   ttsEnabled: false,
+  ttsVoiceUri: null,
 };
 
 function loadPlaybackPreferences(): PlaybackPreferences {
@@ -67,6 +89,19 @@ function loadPlaybackPreferences(): PlaybackPreferences {
       return DEFAULT_PLAYBACK_PREFS;
     }
     const parsed = JSON.parse(raw) as Partial<Record<keyof PlaybackPreferences, unknown>>;
+    const groupId =
+      typeof parsed.groupId === 'string' && parsed.groupId.trim().length > 0
+        ? parsed.groupId.trim()
+        : null;
+    const range = VALID_RANGES.includes(parsed.range as RaceRange)
+      ? (parsed.range as RaceRange)
+      : DEFAULT_PLAYBACK_PREFS.range;
+    const rawCustomDate =
+      typeof parsed.customDate === 'string' && isValidIsoDate(parsed.customDate)
+        ? parsed.customDate
+        : null;
+    const dateMode: DateSelectionMode =
+      parsed.dateMode === 'custom' && rawCustomDate ? 'custom' : 'today';
     const cameraMode = VALID_CAMERA_MODES.includes(parsed.cameraMode as CameraMode)
       ? (parsed.cameraMode as CameraMode)
       : DEFAULT_PLAYBACK_PREFS.cameraMode;
@@ -85,7 +120,22 @@ function loadPlaybackPreferences(): PlaybackPreferences {
       typeof parsed.ttsEnabled === 'boolean'
         ? parsed.ttsEnabled
         : DEFAULT_PLAYBACK_PREFS.ttsEnabled;
-    return { cameraMode, showLabels, speed, commentaryEnabled, ttsEnabled };
+    const ttsVoiceUri =
+      typeof parsed.ttsVoiceUri === 'string' && parsed.ttsVoiceUri.trim().length > 0
+        ? parsed.ttsVoiceUri
+        : null;
+    return {
+      groupId,
+      range,
+      dateMode,
+      customDate: dateMode === 'custom' ? rawCustomDate : null,
+      cameraMode,
+      showLabels,
+      speed,
+      commentaryEnabled,
+      ttsEnabled,
+      ttsVoiceUri,
+    };
   } catch {
     return DEFAULT_PLAYBACK_PREFS;
   }
@@ -268,9 +318,15 @@ function RiderBreakdownPanel({
 
 export function RacePage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [range, setRange] = useState<RaceRange>('daily');
-  const [date, setDate] = useState<string>(() => getTodayIsoDate());
   const initialPrefs = useMemo(() => loadPlaybackPreferences(), []);
+  const [savedGroupId, setSavedGroupId] = useState<string | null>(initialPrefs.groupId);
+  const [range, setRange] = useState<RaceRange>(initialPrefs.range);
+  const [dateMode, setDateMode] = useState<DateSelectionMode>(initialPrefs.dateMode);
+  const [date, setDate] = useState<string>(() =>
+    initialPrefs.dateMode === 'custom' && initialPrefs.customDate
+      ? initialPrefs.customDate
+      : getTodayIsoDate(),
+  );
   const [cameraMode, setCameraMode] = useState<CameraMode>(initialPrefs.cameraMode);
   const [showLabels, setShowLabels] = useState<boolean>(initialPrefs.showLabels);
   const [speed, setSpeed] = useState<PlaybackSpeed>(initialPrefs.speed);
@@ -278,15 +334,37 @@ export function RacePage() {
     initialPrefs.commentaryEnabled,
   );
   const [ttsEnabled, setTtsEnabled] = useState<boolean>(initialPrefs.ttsEnabled);
+  const [ttsVoiceUri, setTtsVoiceUri] = useState<string | null>(initialPrefs.ttsVoiceUri);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [waitingForCommentary, setWaitingForCommentary] = useState<boolean>(false);
   const [uiTimelineT, setUiTimelineT] = useState<number>(0);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
 
-  // Persist user's playback, camera, and announcer preferences across reloads
+  // Persist user's filter, playback, camera, and announcer/voice preferences across reloads
   useEffect(() => {
-    savePlaybackPreferences({ cameraMode, showLabels, speed, commentaryEnabled, ttsEnabled });
-  }, [cameraMode, showLabels, speed, commentaryEnabled, ttsEnabled]);
+    savePlaybackPreferences({
+      groupId: savedGroupId,
+      range,
+      dateMode,
+      customDate: dateMode === 'custom' ? date : null,
+      cameraMode,
+      showLabels,
+      speed,
+      commentaryEnabled,
+      ttsEnabled,
+      ttsVoiceUri,
+    });
+  }, [
+    savedGroupId,
+    range,
+    dateMode,
+    date,
+    cameraMode,
+    showLabels,
+    speed,
+    commentaryEnabled,
+    ttsEnabled,
+    ttsVoiceUri,
+  ]);
 
   // Refs shared with the 60fps Three.js render loop to avoid per-frame React re-renders
   const timelineTRef = useRef<number>(0);
@@ -294,6 +372,7 @@ export function RacePage() {
   const speedRef = useRef<PlaybackSpeed>(initialPrefs.speed);
   const lastRaceIdentityRef = useRef<string | null>(null);
   const lastDataSignatureRef = useRef<string | null>(null);
+  const lastSpokenKeyRef = useRef<string | null>(null);
 
   isPlayingRef.current = isPlaying;
   speedRef.current = speed;
@@ -303,13 +382,18 @@ export function RacePage() {
 
   const paramGroupId = searchParams.get('group') ?? undefined;
   const activeGroupId =
-    groups.find((g) => g.groupId === paramGroupId)?.groupId ?? groups[0]?.groupId;
+    groups.find((g) => g.groupId === paramGroupId)?.groupId ??
+    groups.find((g) => g.groupId === savedGroupId)?.groupId ??
+    groups[0]?.groupId;
 
   useEffect(() => {
     if (activeGroupId && activeGroupId !== paramGroupId) {
       setSearchParams({ group: activeGroupId }, { replace: true });
     }
-  }, [activeGroupId, paramGroupId, setSearchParams]);
+    if (activeGroupId && activeGroupId !== savedGroupId) {
+      setSavedGroupId(activeGroupId);
+    }
+  }, [activeGroupId, paramGroupId, savedGroupId, setSearchParams]);
 
   const raceQuery = useRace(activeGroupId, range, date);
   const raceData = raceQuery.data;
@@ -335,7 +419,7 @@ export function RacePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [raceSignature]);
 
-  // Reset playback ONLY when switching group/range/date window; preserve cursor on identical polls
+  // Reset riders cleanly to starting line on race change (no auto-play so the user's Play click unlocks browser TTS)
   useEffect(() => {
     if (!timeline || !raceIdentity || !raceSignature) {
       return;
@@ -346,23 +430,16 @@ export function RacePage() {
     lastDataSignatureRef.current = raceSignature;
 
     if (identityChanged) {
+      cancelSpeech();
+      lastSpokenKeyRef.current = null;
       if (prefersReducedMotion()) {
         timelineTRef.current = timeline.activeSegmentCount;
         setUiTimelineT(timeline.activeSegmentCount);
-        setIsPlaying(false);
-        setWaitingForCommentary(false);
-      } else if (commentaryEnabled && commentaryQuery.isPending) {
-        // Hold riders at the starting line until AI commentary resolves (or settles with error)
-        timelineTRef.current = 0;
-        setUiTimelineT(0);
-        setIsPlaying(false);
-        setWaitingForCommentary(true);
       } else {
         timelineTRef.current = 0;
         setUiTimelineT(0);
-        setWaitingForCommentary(false);
-        setIsPlaying(true);
       }
+      setIsPlaying(false);
       return;
     }
 
@@ -371,19 +448,7 @@ export function RacePage() {
       timelineTRef.current = timeline.activeSegmentCount;
       setUiTimelineT(timeline.activeSegmentCount);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeline, raceIdentity, raceSignature]);
-
-  // Start auto-play as soon as commentary finishes loading (or if user hides commentary)
-  useEffect(() => {
-    if (!waitingForCommentary || !timeline) {
-      return;
-    }
-    if (!commentaryEnabled || !commentaryQuery.isPending) {
-      setWaitingForCommentary(false);
-      setIsPlaying(true);
-    }
-  }, [waitingForCommentary, commentaryEnabled, commentaryQuery.isPending, timeline]);
 
   // Drive playback clock smoothly; throttle React HUD/scrubber updates to ~20 Hz
   useEffect(() => {
@@ -448,35 +513,69 @@ export function RacePage() {
   }, [timeline, isPlaying]);
 
   const handleGroupChange = (nextGroupId: string) => {
+    setSavedGroupId(nextGroupId);
     setSearchParams({ group: nextGroupId });
   };
 
+  /**
+   * Synchronously triggers or unlocks browser speechSynthesis inside the user's click/tap
+   * gesture so Chrome/Safari/iOS play audio on the very first click without toggling TTS.
+   */
+  const unlockAndSpeakForT = useCallback(
+    (targetT: number) => {
+      if (!commentaryEnabled || !ttsEnabled || !timeline) {
+        return;
+      }
+      const targetFrame = sampleRaceTimeline(timeline, targetT);
+      const entry =
+        commentaryQuery.data?.days.find((d) => d.date === targetFrame.activeDay.date) ??
+        commentaryQuery.data?.days[commentaryQuery.data.days.length - 1];
+
+      if (entry?.commentary) {
+        lastSpokenKeyRef.current = buildCommentarySpeakKey(
+          commentaryQuery.data?.generatedAt,
+          entry.date,
+          entry.commentary,
+        );
+        speakText(entry.commentary, ttsVoiceUri);
+      } else {
+        // Warm up speechSynthesis inside the user gesture while commentary finishes loading
+        speakText(' ', ttsVoiceUri);
+      }
+    },
+    [commentaryEnabled, ttsEnabled, timeline, commentaryQuery.data, ttsVoiceUri],
+  );
+
   const handleTogglePlay = useCallback(() => {
     if (!timeline) return;
-    setWaitingForCommentary(false);
-    setIsPlaying((prev) => {
-      if (prev) {
-        return false;
-      }
-      if (timelineTRef.current >= timeline.activeSegmentCount - 0.001) {
-        timelineTRef.current = 0;
-        setUiTimelineT(0);
-      }
-      return true;
-    });
-  }, [timeline]);
+    if (isPlaying) {
+      cancelSpeech();
+      setIsPlaying(false);
+      return;
+    }
+    const startT =
+      timelineTRef.current >= timeline.activeSegmentCount - 0.001 ? 0 : timelineTRef.current;
+    if (startT === 0) {
+      timelineTRef.current = 0;
+      setUiTimelineT(0);
+      lastSpokenKeyRef.current = null;
+    }
+    unlockAndSpeakForT(startT);
+    setIsPlaying(true);
+  }, [timeline, isPlaying, unlockAndSpeakForT]);
 
   const handleReplay = useCallback(() => {
     if (!timeline) return;
-    setWaitingForCommentary(false);
     timelineTRef.current = 0;
     setUiTimelineT(0);
+    lastSpokenKeyRef.current = null;
+    unlockAndSpeakForT(0);
     setIsPlaying(true);
-  }, [timeline]);
+  }, [timeline, unlockAndSpeakForT]);
 
   const handleSkipToFinish = useCallback(() => {
     if (!timeline) return;
-    setWaitingForCommentary(false);
+    cancelSpeech();
     timelineTRef.current = timeline.activeSegmentCount;
     setUiTimelineT(timeline.activeSegmentCount);
     setIsPlaying(false);
@@ -485,7 +584,6 @@ export function RacePage() {
   const handleScrub = useCallback(
     (nextT: number) => {
       if (!timeline) return;
-      setWaitingForCommentary(false);
       const clamped = Math.max(0, Math.min(timeline.activeSegmentCount, nextT));
       timelineTRef.current = clamped;
       setUiTimelineT(clamped);
@@ -513,7 +611,24 @@ export function RacePage() {
   }, [timeline, uiTimelineT]);
 
   const hasCurrentUser = Boolean(raceData?.standings.some((s) => s.isCurrentUser));
-  const isToday = date === getTodayIsoDate();
+  const isToday = dateMode === 'today' && date === getTodayIsoDate();
+  const isCommentaryLoading = commentaryEnabled && Boolean(raceData) && commentaryQuery.isPending;
+
+  const playOverlayMode: 'hidden' | 'play' | 'replay' | 'loading' = useMemo(() => {
+    if (!timeline || isPlaying) {
+      return 'hidden';
+    }
+    if (isCommentaryLoading && uiTimelineT <= 0.001) {
+      return 'loading';
+    }
+    if (uiTimelineT >= timeline.activeSegmentCount - 0.001) {
+      return 'replay';
+    }
+    if (uiTimelineT <= 0.001) {
+      return 'play';
+    }
+    return 'hidden';
+  }, [timeline, isPlaying, isCommentaryLoading, uiTimelineT]);
 
   return (
     <div className="page-stack race-page-stack">
@@ -587,8 +702,10 @@ export function RacePage() {
                 aria-label="Race date"
                 value={date}
                 onChange={(e) => {
-                  if (e.target.value) {
-                    setDate(e.target.value);
+                  const val = e.target.value;
+                  if (val) {
+                    setDate(val);
+                    setDateMode(val === getTodayIsoDate() ? 'today' : 'custom');
                   }
                 }}
               />
@@ -596,7 +713,10 @@ export function RacePage() {
                 type="button"
                 className="btn btn-secondary btn-sm race-today-btn"
                 disabled={isToday}
-                onClick={() => setDate(getTodayIsoDate())}
+                onClick={() => {
+                  setDate(getTodayIsoDate());
+                  setDateMode('today');
+                }}
               >
                 Today
               </button>
@@ -655,6 +775,8 @@ export function RacePage() {
                     cameraMode={cameraMode}
                     showLabels={showLabels}
                     hasCurrentUser={hasCurrentUser}
+                    playOverlayMode={playOverlayMode}
+                    onPlayOverlayClick={playOverlayMode === 'replay' ? handleReplay : handleTogglePlay}
                     onCameraModeChange={setCameraMode}
                     onToggleLabels={() => setShowLabels((v) => !v)}
                   />
@@ -663,6 +785,7 @@ export function RacePage() {
                 <RaceCommentaryTicker
                   enabled={commentaryEnabled}
                   ttsEnabled={ttsEnabled}
+                  ttsVoiceUri={ttsVoiceUri}
                   isPlaying={isPlaying}
                   activeDayDate={uiFrame.activeDay.date}
                   isFinalDay={
@@ -672,15 +795,17 @@ export function RacePage() {
                   data={commentaryQuery.data}
                   isPending={commentaryQuery.isPending}
                   error={commentaryQuery.error}
+                  lastSpokenKeyRef={lastSpokenKeyRef}
                   onToggleEnabled={() => setCommentaryEnabled((v) => !v)}
-                  onToggleTts={() => setTtsEnabled((v) => !v)}
+                  onSetTtsEnabled={setTtsEnabled}
+                  onSelectVoiceUri={setTtsVoiceUri}
                 />
 
                 <PlaybackControls
                   timeline={timeline}
                   frame={uiFrame}
                   isPlaying={isPlaying}
-                  waitingForCommentary={waitingForCommentary}
+                  waitingForCommentary={isCommentaryLoading}
                   speed={speed}
                   onTogglePlay={handleTogglePlay}
                   onReplay={handleReplay}
