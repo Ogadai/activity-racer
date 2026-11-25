@@ -1,5 +1,6 @@
 import type { RaceTimeline, RaceTimelineFrame } from '../race/trackMath';
 import { PauseIcon, PlayIcon, ReplayIcon, SkipEndIcon } from './Icons';
+import styles from './PlaybackControls.module.css';
 
 export const PLAYBACK_SPEEDS = [0.5, 1, 2, 4] as const;
 export type PlaybackSpeed = (typeof PLAYBACK_SPEEDS)[number];
@@ -34,15 +35,18 @@ export function PlaybackControls({
   const fillPct = maxT > 0 ? Math.min(100, Math.max(0, (frame.t / maxT) * 100)) : 100;
 
   return (
-    <div className="playback-panel">
+    <div className={styles.panel}>
       {/* Compact Broadcast HUD: Active Day + Live Dynamic Rank Order */}
-      <div className="broadcast-hud">
-        <div className="broadcast-hud-day">
-          <span className={isPlaying ? 'hud-status-dot live' : 'hud-status-dot'} aria-hidden="true" />
-          <span className="hud-day-label">
+      <div className={styles.broadcastHud}>
+        <div className={styles.broadcastHudDay}>
+          <span
+            className={isPlaying ? `${styles.hudStatusDot} ${styles.live}` : styles.hudStatusDot}
+            aria-hidden="true"
+          />
+          <span className={styles.hudDayLabel}>
             {frame.activeDay?.fullLabel ?? (timeline.range === 'weekly' ? 'Weekly' : 'Daily')}
           </span>
-          <span className="hud-state-tag">
+          <span className={styles.hudStateTag}>
             {isPlaying
               ? 'Live'
               : waitingForCommentary
@@ -55,22 +59,22 @@ export function PlaybackControls({
           </span>
         </div>
 
-        <div className="broadcast-hud-ranks" aria-label="Live race rank order">
+        <div className={styles.broadcastHudRanks} aria-label="Live race rank order">
           {frame.liveStandings.slice(0, 5).map((rider) => (
             <div
               key={rider.userId}
-              className={`hud-rank-chip${rider.isLiveLeader ? ' leader' : ''}${
-                rider.standing.isCurrentUser ? ' self' : ''
+              className={`${styles.hudRankChip}${rider.isLiveLeader ? ` ${styles.leader}` : ''}${
+                rider.standing.isCurrentUser ? ` ${styles.self}` : ''
               }`}
             >
-              <span className="hud-rank-pos">#{rider.liveRank}</span>
+              <span className={styles.hudRankPos}>#{rider.liveRank}</span>
               <span
                 className="color-dot"
                 style={{ backgroundColor: rider.standing.bikeColor }}
                 aria-hidden="true"
               />
-              <span className="hud-rank-name">{rider.standing.displayName}</span>
-              <span className="hud-rank-val">
+              <span className={styles.hudRankName}>{rider.standing.displayName}</span>
+              <span className={styles.hudRankVal}>
                 {timeline.range === 'weekly'
                   ? `${rider.laps.toFixed(2)}L`
                   : `${rider.livePct.toFixed(0)}%`}
@@ -81,11 +85,11 @@ export function PlaybackControls({
       </div>
 
       {/* Interactive Timeline Scrubber + Day Markers */}
-      <div className="scrubber-block">
-        <div className="scrubber-track-wrap">
+      <div className={styles.scrubberBlock}>
+        <div className={styles.scrubberTrackWrap}>
           <input
             type="range"
-            className="scrubber-input"
+            className={styles.scrubberInput}
             aria-label="Race timeline scrubber"
             min={0}
             max={maxT}
@@ -97,7 +101,7 @@ export function PlaybackControls({
         </div>
 
         {timeline.range === 'weekly' ? (
-          <div className="day-markers" role="group" aria-label="Jump to race day">
+          <div className={styles.dayMarkers} role="group" aria-label="Jump to race day">
             {timeline.days.map((day) => {
               const isCurrent = !day.isUpcoming && frame.activeDayIndex === day.index;
               const isCompleted = !day.isUpcoming && frame.t >= day.index + 0.999;
@@ -107,9 +111,9 @@ export function PlaybackControls({
                   type="button"
                   disabled={day.isUpcoming}
                   title={day.isUpcoming ? `${day.fullLabel} (Upcoming)` : `Jump to ${day.fullLabel}`}
-                  className={`day-marker-btn${isCurrent ? ' active' : ''}${
-                    isCompleted ? ' completed' : ''
-                  }${day.isUpcoming ? ' upcoming' : ''}`}
+                  className={`${styles.dayMarkerBtn}${isCurrent ? ` ${styles.active}` : ''}${
+                    isCompleted ? ` ${styles.completed}` : ''
+                  }${day.isUpcoming ? ` ${styles.upcoming}` : ''}`}
                   onClick={() => onScrub(day.index)}
                 >
                   <span>{day.shortLabel}</span>
@@ -118,12 +122,12 @@ export function PlaybackControls({
             })}
           </div>
         ) : (
-          <div className="daily-markers">
-            <button type="button" className="day-marker-link" onClick={() => onScrub(0)}>
+          <div className={styles.dailyMarkers}>
+            <button type="button" className={styles.dayMarkerLink} onClick={() => onScrub(0)}>
               Start
             </button>
             <span className="muted small">{Math.round(frame.progress * 100)}%</span>
-            <button type="button" className="day-marker-link" onClick={() => onScrub(maxT)}>
+            <button type="button" className={styles.dayMarkerLink} onClick={() => onScrub(maxT)}>
               Finish
             </button>
           </div>
@@ -131,51 +135,55 @@ export function PlaybackControls({
       </div>
 
       {/* Single-line Transport & Speed Controls */}
-      <div className="transport-bar">
-        <div className="transport-buttons">
+      <div className={styles.transportBar}>
+        <div className={styles.transportButtons}>
           <button
             type="button"
-            className="btn btn-primary btn-sm transport-btn"
+            className={`btn btn-primary btn-sm ${styles.transportBtn}`}
             onClick={onTogglePlay}
             aria-label={isPlaying ? 'Pause race animation' : isAtFinish ? 'Play again' : 'Play race animation'}
             title={isPlaying ? 'Pause' : isAtFinish ? 'Play Again' : 'Play'}
           >
             {isPlaying ? <PauseIcon size={17} /> : <PlayIcon size={17} />}
-            <span className="transport-btn-label">
+            <span className={styles.transportBtnLabel}>
               {isPlaying ? 'Pause' : isAtFinish ? 'Play Again' : 'Play'}
             </span>
           </button>
           <button
             type="button"
-            className="btn btn-secondary btn-sm transport-btn"
+            className={`btn btn-secondary btn-sm ${styles.transportBtn}`}
             onClick={onReplay}
             aria-label="Replay race from start"
             title="Replay"
           >
             <ReplayIcon size={17} />
-            <span className="transport-btn-label">Replay</span>
+            <span className={styles.transportBtnLabel}>Replay</span>
           </button>
           <button
             type="button"
-            className="btn btn-secondary btn-sm transport-btn"
+            className={`btn btn-secondary btn-sm ${styles.transportBtn}`}
             onClick={onSkipToFinish}
             disabled={isAtFinish && !isPlaying}
             aria-label="Skip to final standings"
             title="Skip to Finish"
           >
             <SkipEndIcon size={17} />
-            <span className="transport-btn-label">Finish</span>
+            <span className={styles.transportBtnLabel}>Finish</span>
           </button>
         </div>
 
-        <div className="speed-control">
-          <span className="muted small speed-label">Speed</span>
+        <div className={styles.speedControl}>
+          <span className={`muted small ${styles.speedLabel}`}>Speed</span>
           <div className="segmented" role="group" aria-label="Playback speed">
             {PLAYBACK_SPEEDS.map((s) => (
               <button
                 key={s}
                 type="button"
-                className={speed === s ? 'seg-btn speed-btn active' : 'seg-btn speed-btn'}
+                className={
+                  speed === s
+                    ? `seg-btn ${styles.speedBtn} active`
+                    : `seg-btn ${styles.speedBtn}`
+                }
                 onClick={() => onSpeedChange(s)}
               >
                 {s}×

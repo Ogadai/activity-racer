@@ -1,0 +1,288 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 0.95rem 1.05rem;
+  border-radius: 12px;
+  background: var(--color-bg-surface-subtle);
+  border: 1px solid var(--color-border-subtle);
+}
+
+.broadcastHud {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.broadcastHudDay {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.hudStatusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.hudStatusDot.live {
+  background: var(--color-success);
+  box-shadow: 0 0 0 3px var(--color-success-subtle-bg);
+}
+
+.hudDayLabel {
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--color-text-primary);
+}
+
+.hudStateTag {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.12rem 0.48rem;
+  border-radius: 999px;
+  background: var(--color-pill-neutral-bg);
+  color: var(--color-pill-neutral-text);
+}
+
+.broadcastHudRanks {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.hudRankChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.22rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-subtle);
+  color: var(--color-text-primary);
+}
+
+.hudRankChip.leader {
+  border-color: var(--color-secondary);
+}
+
+.hudRankChip.self {
+  background: var(--color-primary-subtle-bg);
+  border-color: var(--color-primary-subtle-border);
+}
+
+.hudRankPos {
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.hudRankName {
+  font-weight: 600;
+  max-width: 88px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hudRankVal {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+}
+
+.scrubberBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.scrubberTrackWrap {
+  display: flex;
+  align-items: center;
+}
+
+.scrubberInput {
+  width: 100%;
+  margin: 0;
+  height: 6px;
+  border-radius: 999px;
+  cursor: pointer;
+  accent-color: var(--color-primary);
+}
+
+.dayMarkers {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.dayMarkerBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.05rem;
+  padding: 0.34rem 0.25rem;
+  border-radius: 7px;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-surface);
+  color: var(--color-text-secondary);
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.dayMarkerBtn:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.dayMarkerBtn.completed {
+  border-color: var(--color-primary-subtle-border);
+  color: var(--color-text-primary);
+}
+
+.dayMarkerBtn.active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-text-on-primary);
+}
+
+.dayMarkerBtn.upcoming,
+.dayMarkerBtn:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
+.dailyMarkers {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.dayMarkerLink {
+  border: none;
+  background: transparent;
+  padding: 0.1rem 0.25rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  cursor: pointer;
+}
+
+.dayMarkerLink:hover {
+  text-decoration: underline;
+}
+
+.transportBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: nowrap;
+}
+
+.transportButtons {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: nowrap;
+}
+
+.transportBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.32rem;
+  white-space: nowrap;
+}
+
+.transportBtnLabel {
+  display: inline;
+}
+
+.speedControl {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-shrink: 0;
+}
+
+.speedLabel {
+  display: inline;
+}
+
+.speedBtn {
+  padding: 0.34rem 0.55rem;
+  font-size: 0.78rem;
+}
+
+@media (max-width: 640px) {
+  .panel {
+    padding: 0.65rem 0.7rem;
+    gap: 0.55rem;
+  }
+
+  .broadcastHud {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.4rem;
+  }
+
+  .hudDayLabel {
+    font-size: 0.84rem;
+  }
+
+  .broadcastHudRanks {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 0.1rem;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .broadcastHudRanks::-webkit-scrollbar {
+    display: none;
+  }
+
+  .hudRankChip {
+    flex-shrink: 0;
+    padding: 0.18rem 0.45rem;
+    font-size: 0.73rem;
+  }
+
+  .dayMarkers {
+    gap: 0.2rem;
+  }
+
+  .dayMarkerBtn {
+    padding: 0.26rem 0.1rem;
+    font-size: 0.7rem;
+  }
+
+  .transportBtn {
+    padding: 0.38rem 0.56rem;
+  }
+
+  .transportBtnLabel,
+  .speedLabel {
+    display: none;
+  }
+
+  .speedBtn {
+    padding: 0.32rem 0.46rem;
+    font-size: 0.74rem;
+  }
+}

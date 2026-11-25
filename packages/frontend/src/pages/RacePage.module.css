@@ -1,0 +1,615 @@
+/* Compact Race Controls Strip */
+.racePageStack {
+  gap: 0.9rem;
+}
+
+.controlsStrip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  padding: 0.75rem 1rem;
+  flex-wrap: wrap;
+}
+
+.controlsPrimary,
+.controlsSecondary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: nowrap;
+}
+
+.controlsPrimary {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.controlsSecondary {
+  flex: 0 1 auto;
+}
+
+.groupSelect,
+.dateInput {
+  padding: 0.44rem 0.65rem;
+  border: 1px solid var(--color-border-default);
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  background: var(--color-bg-input);
+  color: var(--color-text-primary);
+  min-width: 0;
+}
+
+.groupSelect {
+  flex: 1 1 auto;
+  max-width: 260px;
+  text-overflow: ellipsis;
+}
+
+.dateInput {
+  width: 142px;
+  font-weight: 500;
+}
+
+.groupSelect:focus,
+.dateInput:focus {
+  outline: 2px solid var(--color-focus-ring);
+  border-color: var(--color-primary);
+}
+
+.rangeSegmented {
+  flex-shrink: 0;
+}
+
+.rangeSegBtn {
+  padding: 0.44rem 0.72rem;
+  font-size: 0.84rem;
+}
+
+.todayBtn,
+.refreshBtn {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.refreshBtnText {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8rem;
+}
+
+.iconSpin {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Velodrome Card & Lazy Fallback */
+.velodromeCard {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.velodromeLoading {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-surface-subtle);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+}
+
+/* Standings Table & Leader/You/Overdrive Highlighting */
+.standingsCard {
+  /* Overrides applied at mobile breakpoint */
+}
+
+.standingsHead {
+  margin-bottom: 0.6rem;
+}
+
+.standingsTitleGroup {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.standingsTitleGroup h2 {
+  margin: 0;
+}
+
+.standingsMetaRight {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.standingsHint {
+  display: inline;
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.raceTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.raceTable th,
+.raceTable td {
+  text-align: left;
+  padding: 0.85rem 0.75rem;
+  border-bottom: 1px solid var(--color-border-subtle);
+  vertical-align: middle;
+}
+
+.raceTable th {
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  background: var(--color-bg-surface-subtle);
+}
+
+.colDesktopOnly {
+  display: table-cell;
+}
+
+.colChevron {
+  width: 28px;
+  text-align: right;
+  padding-left: 0.2rem !important;
+}
+
+.raceRowClickable {
+  cursor: pointer;
+  transition: background 0.14s ease;
+}
+
+.raceRowClickable:hover {
+  background: var(--color-bg-hover);
+}
+
+.raceRowClickable:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+
+.rowCurrentUser {
+  background: var(--color-row-highlight-bg);
+}
+
+.raceRowClickable.rowCurrentUser {
+  background: var(--color-row-highlight-bg);
+}
+
+.raceRowClickable.rowCurrentUser td:first-child {
+  box-shadow: inset 3px 0 0 var(--color-primary);
+}
+
+.raceRowClickable.rowLeader td:first-child {
+  box-shadow: inset 3px 0 0 var(--color-secondary);
+}
+
+.raceRowClickable.rowCurrentUser.rowLeader td:first-child {
+  box-shadow: inset 3px 0 0 var(--color-secondary), inset 6px 0 0 var(--color-primary);
+}
+
+.raceRowClickable.rowExpanded td {
+  border-bottom-color: transparent;
+}
+
+.rankCell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+
+.rankNum {
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.pillLeaderBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22rem;
+  margin-left: 0;
+}
+
+.leaderWord {
+  display: inline;
+}
+
+.racerCell {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.racerIdentity {
+  min-width: 0;
+}
+
+.racerName {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.racerDisplayName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.racerSlug {
+  display: inline;
+}
+
+.scoreCell {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.miniBar {
+  margin-top: 0.35rem;
+  width: 120px;
+  height: 6px;
+  background: var(--color-progress-track);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.miniBarFill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.rowChevron {
+  color: var(--color-text-muted);
+  transition: transform 0.18s ease, color 0.18s ease;
+}
+
+.rowChevron.open {
+  transform: rotate(180deg);
+  color: var(--color-primary);
+}
+
+.miniBarFill.overdrive,
+.breakdownBarFill.overdrive,
+.weeklyBarStick.overdrive {
+  background: linear-gradient(90deg, #9333ea, #3ea2dd);
+}
+
+.weeklyBarStick.overdrive {
+  background: linear-gradient(180deg, #c084fc, #7e22ce);
+}
+
+/* Breakdown Drawer */
+.breakdownRow td {
+  padding: 0 0.75rem 0.95rem !important;
+  background: var(--color-bg-surface-subtle);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.breakdownPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.85rem 0.95rem;
+  border-radius: 10px;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-subtle);
+}
+
+.breakdownFormulaRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  flex-wrap: wrap;
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+  padding-bottom: 0.55rem;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.breakdownFormulaText {
+  line-height: 1.4;
+}
+
+.breakdownMetricsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.breakdownMetricCard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  background: var(--color-bg-surface-subtle);
+  border: 1px solid var(--color-border-subtle);
+}
+
+.breakdownMetricHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.breakdownMetricTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.breakdownMetricPct {
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.breakdownMetricRaw {
+  font-size: 0.84rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.breakdownBarTrack {
+  margin-top: 0.2rem;
+  width: 100%;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--color-progress-track);
+  overflow: hidden;
+}
+
+.breakdownBarFill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.25s ease;
+}
+
+/* Weekly 7-Day Mini Bar Chart */
+.weeklyBarsSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.weeklyBarsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.weeklyBarsGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.weeklyBarCol {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.22rem;
+  padding: 0.42rem 0.2rem;
+  border-radius: 8px;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-surface-subtle);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.weeklyBarCol:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+  border-color: var(--color-primary-subtle-border);
+}
+
+.weeklyBarCol.active {
+  border-color: var(--color-primary);
+  background: var(--color-primary-subtle-bg);
+}
+
+.weeklyBarCol.upcoming,
+.weeklyBarCol:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.weeklyBarPct {
+  font-size: 0.7rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.weeklyBarCol.overdrive .weeklyBarPct {
+  color: var(--color-overdrive-subtle-text);
+}
+
+.weeklyBarWell {
+  position: relative;
+  width: 18px;
+  height: 56px;
+  border-radius: 5px;
+  background: var(--color-progress-track);
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+}
+
+.weeklyBarTargetLine {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 66.67%;
+  border-top: 1px dashed rgba(100, 116, 139, 0.7);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.weeklyBarStick {
+  width: 100%;
+  min-height: 2px;
+  border-radius: 4px 4px 0 0;
+  transition: height 0.25s ease;
+}
+
+.weeklyBarDay {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+}
+
+.weeklyBarRaw {
+  font-size: 0.65rem;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 640px) {
+  .racePageStack {
+    gap: 0.65rem;
+  }
+
+  .controlsStrip {
+    padding: 0.55rem 0.65rem;
+    gap: 0.45rem;
+  }
+
+  .controlsPrimary,
+  .controlsSecondary {
+    width: 100%;
+    gap: 0.4rem;
+  }
+
+  .groupSelect {
+    max-width: none;
+    padding: 0.38rem 0.55rem;
+    font-size: 0.84rem;
+  }
+
+  .rangeSegBtn {
+    padding: 0.38rem 0.62rem;
+    font-size: 0.8rem;
+  }
+
+  .dateInput {
+    flex: 1 1 auto;
+    width: auto;
+    padding: 0.36rem 0.5rem;
+    font-size: 0.82rem;
+  }
+
+  .todayBtn {
+    padding: 0.36rem 0.6rem;
+    font-size: 0.8rem;
+  }
+
+  .refreshBtn {
+    padding: 0.38rem 0.5rem;
+  }
+
+  .refreshBtnText {
+    display: none;
+  }
+
+  .velodromeCard {
+    padding: 0.65rem;
+    gap: 0.65rem;
+  }
+
+  .velodromeLoading {
+    aspect-ratio: 4 / 3;
+  }
+
+  .standingsCard {
+    padding: 0.75rem;
+  }
+
+  .standingsHint {
+    display: none;
+  }
+
+  .colDesktopOnly {
+    display: none;
+  }
+
+  .raceTable th,
+  .raceTable td {
+    padding: 0.65rem 0.4rem;
+    font-size: 0.85rem;
+  }
+
+  .leaderWord,
+  .racerSlug {
+    display: none;
+  }
+
+  .miniBar {
+    width: 78px;
+  }
+
+  .breakdownRow td {
+    padding: 0 0.25rem 0.75rem !important;
+  }
+
+  .breakdownPanel {
+    padding: 0.65rem;
+    gap: 0.6rem;
+  }
+
+  .breakdownMetricsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .weeklyBarsGrid {
+    gap: 0.2rem;
+  }
+
+  .weeklyBarCol {
+    padding: 0.3rem 0.1rem;
+  }
+
+  .weeklyBarWell {
+    width: 14px;
+    height: 46px;
+  }
+
+  .weeklyBarPct,
+  .weeklyBarDay {
+    font-size: 0.66rem;
+  }
+
+  .weeklyBarRaw {
+    font-size: 0.6rem;
+  }
+}

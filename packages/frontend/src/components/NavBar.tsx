@@ -2,6 +2,7 @@ import { NavLink } from 'react-router-dom';
 import { useProfile } from '../api/queries';
 import { useAuth } from '../auth/AuthContext';
 import { BikeIcon, FlagIcon, GroupsIcon, LogoutIcon, SettingsIcon } from './Icons';
+import styles from './NavBar.module.css';
 
 export function NavBar() {
   const { user, signOut } = useAuth();
@@ -10,56 +11,54 @@ export function NavBar() {
   const displayLabel = profile?.displayName ?? user?.name ?? user?.email ?? 'Racer';
   const bikeColor = profile?.bikeColor ?? 'var(--color-primary)';
 
+  const navLinkClass = ({ isActive }: { isActive: boolean }) =>
+    isActive ? `${styles.navLink} ${styles.active}` : styles.navLink;
+
   return (
-    <header className="navbar">
-      <div className="navbar-inner">
-        <div className="navbar-left">
-          <NavLink to="/race" className="brand" aria-label="Activity Racer Home">
-            <span className="brand-badge" style={{ backgroundColor: bikeColor }} aria-hidden="true">
+    <header className={styles.navbar}>
+      <div className={styles.navbarInner}>
+        <div className={styles.navbarLeft}>
+          <NavLink to="/race" className={styles.brand} aria-label="Activity Racer Home">
+            <span
+              className={styles.brandBadge}
+              style={{ backgroundColor: bikeColor }}
+              aria-hidden="true"
+            >
               <BikeIcon size={16} />
             </span>
-            <span className="brand-text">Activity Racer</span>
+            <span className={styles.brandText}>Activity Racer</span>
           </NavLink>
 
-          <nav className="nav-links" aria-label="Main navigation">
-            <NavLink
-              to="/race"
-              className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}
-            >
+          <nav className={styles.navLinks} aria-label="Main navigation">
+            <NavLink to="/race" className={navLinkClass}>
               <FlagIcon size={16} />
               <span>Race</span>
             </NavLink>
-            <NavLink
-              to="/groups"
-              className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}
-            >
+            <NavLink to="/groups" className={navLinkClass}>
               <GroupsIcon size={16} />
               <span>Groups</span>
             </NavLink>
-            <NavLink
-              to="/settings"
-              className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}
-            >
+            <NavLink to="/settings" className={navLinkClass}>
               <SettingsIcon size={16} />
               <span>Settings</span>
             </NavLink>
           </nav>
         </div>
 
-        <div className="navbar-right">
-          <span className="user-pill" title={user?.email ?? displayLabel}>
+        <div className={styles.navbarRight}>
+          <span className={styles.userPill} title={user?.email ?? displayLabel}>
             <span className="color-dot" style={{ backgroundColor: bikeColor }} aria-hidden="true" />
-            <span className="user-pill-name">{displayLabel}</span>
+            <span className={styles.userPillName}>{displayLabel}</span>
           </span>
           <button
             type="button"
-            className="btn btn-secondary btn-sm nav-signout-btn"
+            className={`btn btn-secondary btn-sm ${styles.navSignoutBtn}`}
             onClick={() => void signOut()}
             aria-label="Sign out"
             title="Sign out"
           >
             <LogoutIcon size={16} />
-            <span className="nav-signout-label">Sign Out</span>
+            <span className={styles.navSignoutLabel}>Sign Out</span>
           </button>
         </div>
       </div>

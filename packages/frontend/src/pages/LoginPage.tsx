@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useHealth } from '../api/queries';
 import { useAuth } from '../auth/AuthContext';
+import styles from './LoginPage.module.css';
 
 interface LocationState {
   from?: string;
@@ -76,8 +77,8 @@ export function LoginPage() {
 
   return (
     <main className="center-screen">
-      <section className="card login-card">
-        <span className="badge">Activity Racer</span>
+      <section className={`card ${styles.loginCard}`}>
+        <span className={styles.badge}>Activity Racer</span>
         <h1>Race Your Daily Goals</h1>
         <p className="subtitle">
           Fair, ability-handicapped step &amp; active-calorie races with friends and family, synced
@@ -98,7 +99,7 @@ export function LoginPage() {
 
         <button
           type="button"
-          className="btn-google"
+          className={styles.btnGoogle}
           disabled={status === 'loading' || redirecting || !googleReady}
           onClick={() => void handleGoogleLogin()}
         >
@@ -107,7 +108,7 @@ export function LoginPage() {
         </button>
 
         {status !== 'loading' && config && !googleReady && (
-          <div className="alert alert-info setup-box">
+          <div className={`alert alert-info ${styles.setupBox}`}>
             <strong>Google OAuth2 Setup Pending</strong>
             <p>
               The Cognito OAuth domain is live, waiting for your Google Cloud OAuth 2.0 client to be
@@ -132,20 +133,20 @@ export function LoginPage() {
           </div>
         )}
 
-        <p className="login-footnote">
+        <p className={styles.loginFootnote}>
           Secured with Amazon Cognito OAuth 2.0 Authorization Code + PKCE. No passwords stored by
           Activity Racer.
         </p>
 
-        <div className="health-footer">
+        <div className={styles.healthFooter}>
           {healthQuery.isPending && <span className="muted small">Checking API health...</span>}
           {healthQuery.isSuccess && (
-            <span className="health-pill ok">
+            <span className={`${styles.healthPill} ${styles.ok}`}>
               API Online · {healthQuery.data.region}
             </span>
           )}
           {healthQuery.isError && (
-            <span className="health-pill err">API Unreachable</span>
+            <span className={`${styles.healthPill} ${styles.err}`}>API Unreachable</span>
           )}
         </div>
       </section>

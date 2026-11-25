@@ -1,4 +1,5 @@
 import type { SVGProps } from 'react';
+import styles from './Icons.module.css';
 
 type IconProps = SVGProps<SVGSVGElement> & {
   size?: number;
@@ -12,7 +13,7 @@ function BaseIcon({ size = 18, className, children, ...rest }: IconProps) {
       viewBox="0 0 24 24"
       fill="currentColor"
       aria-hidden="true"
-      className={className ? `ui-icon ${className}` : 'ui-icon'}
+      className={className ? `${styles.uiIcon} ${className}` : styles.uiIcon}
       {...rest}
     >
       {children}

@@ -33,6 +33,7 @@ import {
   type RaceTimeline,
 } from '../race/trackMath';
 import { cancelSpeech, speakText } from '../race/tts';
+import styles from './RacePage.module.css';
 
 const VelodromeRace3D = lazy(() => import('../components/VelodromeRace3D'));
 
@@ -183,42 +184,42 @@ function RiderBreakdownPanel({
   const calWeightedContrib = row.calorieWeight * row.caloriePct;
 
   return (
-    <div className="breakdown-panel">
+    <div className={styles.breakdownPanel}>
       {/* Personal formula & metadata */}
-      <div className="breakdown-formula-row">
-        <span className="breakdown-formula-text">
+      <div className={styles.breakdownFormulaRow}>
+        <span className={styles.breakdownFormulaText}>
           <strong>Target formula:</strong>{' '}
           {stepWeightPct}% × Steps / {dailyStepTarget.toLocaleString()}
           {' + '}
           {calWeightPct}% × Cal / {dailyCalTarget.toLocaleString()} kcal
           {range === 'weekly' && ' (÷ 7 days)'}
         </span>
-        <span className="breakdown-sync-meta muted small">
+        <span className="muted small">
           {range === 'weekly' && `${row.daysLogged}/7 days logged · `}
           Sync: {formatTime(row.lastUpdatedAt)}
         </span>
       </div>
 
       {/* Raw vs. normalized progress metrics */}
-      <div className="breakdown-metrics-grid">
-        <div className="breakdown-metric-card">
-          <div className="breakdown-metric-head">
-            <span className="breakdown-metric-title">
+      <div className={styles.breakdownMetricsGrid}>
+        <div className={styles.breakdownMetricCard}>
+          <div className={styles.breakdownMetricHead}>
+            <span className={styles.breakdownMetricTitle}>
               <StepsIcon size={15} />
               <span>Steps</span>
             </span>
-            <span className="breakdown-metric-pct">
+            <span className={styles.breakdownMetricPct}>
               <strong>{row.stepPct.toFixed(1)}%</strong>
               <span className="muted small"> (+{stepWeightedContrib.toFixed(1)} wt)</span>
             </span>
           </div>
-          <div className="breakdown-metric-raw">
+          <div className={styles.breakdownMetricRaw}>
             <strong>{row.steps.toLocaleString()}</strong>
             <span className="muted small"> / {row.stepTarget.toLocaleString()}</span>
           </div>
-          <div className="breakdown-bar-track" aria-hidden="true">
+          <div className={styles.breakdownBarTrack} aria-hidden="true">
             <div
-              className={`breakdown-bar-fill${row.stepPct > 100 ? ' overdrive' : ''}`}
+              className={`${styles.breakdownBarFill}${row.stepPct > 100 ? ` ${styles.overdrive}` : ''}`}
               style={{
                 width: `${Math.min(100, Math.max(0, row.stepPct))}%`,
                 backgroundColor: row.stepPct > 100 ? undefined : row.bikeColor,
@@ -227,24 +228,24 @@ function RiderBreakdownPanel({
           </div>
         </div>
 
-        <div className="breakdown-metric-card">
-          <div className="breakdown-metric-head">
-            <span className="breakdown-metric-title">
+        <div className={styles.breakdownMetricCard}>
+          <div className={styles.breakdownMetricHead}>
+            <span className={styles.breakdownMetricTitle}>
               <FlameIcon size={15} />
               <span>Active Calories</span>
             </span>
-            <span className="breakdown-metric-pct">
+            <span className={styles.breakdownMetricPct}>
               <strong>{row.caloriePct.toFixed(1)}%</strong>
               <span className="muted small"> (+{calWeightedContrib.toFixed(1)} wt)</span>
             </span>
           </div>
-          <div className="breakdown-metric-raw">
+          <div className={styles.breakdownMetricRaw}>
             <strong>{row.activeCalories.toLocaleString()}</strong>
             <span className="muted small"> / {row.calorieTarget.toLocaleString()} kcal</span>
           </div>
-          <div className="breakdown-bar-track" aria-hidden="true">
+          <div className={styles.breakdownBarTrack} aria-hidden="true">
             <div
-              className={`breakdown-bar-fill${row.caloriePct > 100 ? ' overdrive' : ''}`}
+              className={`${styles.breakdownBarFill}${row.caloriePct > 100 ? ` ${styles.overdrive}` : ''}`}
               style={{
                 width: `${Math.min(100, Math.max(0, row.caloriePct))}%`,
                 backgroundColor: row.caloriePct > 100 ? undefined : row.bikeColor,
@@ -256,15 +257,15 @@ function RiderBreakdownPanel({
 
       {/* 7-day Mon-Sun mini bar chart in Weekly mode (click a day to jump the 3D replay) */}
       {range === 'weekly' && row.dailyBreakdown.length > 0 && (
-        <div className="weekly-bars-section">
-          <div className="weekly-bars-header">
+        <div className={styles.weeklyBarsSection}>
+          <div className={styles.weeklyBarsHeader}>
             <span className="small">
               <strong>Mon–Sun Daily Pace</strong>
             </span>
             <span className="muted small">Tap a day to jump replay · Dashed line = 100%</span>
           </div>
 
-          <div className="weekly-bars-grid">
+          <div className={styles.weeklyBarsGrid}>
             {row.dailyBreakdown.map((day, idx) => {
               const timelineDay = timeline.days[idx];
               const isUpcoming = timelineDay?.isUpcoming ?? false;
@@ -278,9 +279,9 @@ function RiderBreakdownPanel({
                   key={day.date}
                   type="button"
                   disabled={isUpcoming}
-                  className={`weekly-bar-col${isActive ? ' active' : ''}${
-                    isUpcoming ? ' upcoming' : ''
-                  }${day.isOverdrive ? ' overdrive' : ''}`}
+                  className={`${styles.weeklyBarCol}${isActive ? ` ${styles.active}` : ''}${
+                    isUpcoming ? ` ${styles.upcoming}` : ''
+                  }${day.isOverdrive ? ` ${styles.overdrive}` : ''}`}
                   title={`${shortLabel} (${day.date}): ${day.weightedScorePct.toFixed(1)}% · ${day.steps.toLocaleString()} steps · ${day.activeCalories.toLocaleString()} kcal`}
                   onClick={(e) => {
                     e.stopPropagation();
@@ -289,21 +290,21 @@ function RiderBreakdownPanel({
                     }
                   }}
                 >
-                  <span className="weekly-bar-pct">
+                  <span className={styles.weeklyBarPct}>
                     {isUpcoming ? '—' : `${Math.round(day.weightedScorePct)}%`}
                   </span>
-                  <div className="weekly-bar-well" aria-hidden="true">
-                    <span className="weekly-bar-target-line" />
+                  <div className={styles.weeklyBarWell} aria-hidden="true">
+                    <span className={styles.weeklyBarTargetLine} />
                     <div
-                      className={`weekly-bar-stick${day.isOverdrive ? ' overdrive' : ''}`}
+                      className={`${styles.weeklyBarStick}${day.isOverdrive ? ` ${styles.overdrive}` : ''}`}
                       style={{
                         height: `${heightPct}%`,
                         backgroundColor: day.isOverdrive ? undefined : row.bikeColor,
                       }}
                     />
                   </div>
-                  <span className="weekly-bar-day">{shortLabel}</span>
-                  <span className="weekly-bar-raw">
+                  <span className={styles.weeklyBarDay}>{shortLabel}</span>
+                  <span className={styles.weeklyBarRaw}>
                     {day.steps > 0 ? `${(day.steps / 1000).toFixed(1)}k` : '0'}
                   </span>
                 </button>
@@ -631,7 +632,7 @@ export function RacePage() {
   }, [timeline, isPlaying, isCommentaryLoading, uiTimelineT]);
 
   return (
-    <div className="page-stack race-page-stack">
+    <div className={`page-stack ${styles.racePageStack}`}>
       {groupsQuery.isPending && (
         <div className="card">
           <p className="muted">Loading your racing groups...</p>
@@ -662,10 +663,10 @@ export function RacePage() {
       {groups.length > 0 && (
         <>
           {/* Compact Race Controls Strip (single row on desktop, 2 tight rows on mobile so track starts above the fold) */}
-          <section className="card race-controls-strip" aria-label="Race filters">
-            <div className="race-controls-primary">
+          <section className={`card ${styles.controlsStrip}`} aria-label="Race filters">
+            <div className={styles.controlsPrimary}>
               <select
-                className="race-group-select"
+                className={styles.groupSelect}
                 aria-label="Racing group"
                 value={activeGroupId ?? ''}
                 onChange={(e) => handleGroupChange(e.target.value)}
@@ -677,17 +678,25 @@ export function RacePage() {
                 ))}
               </select>
 
-              <div className="segmented range-segmented" role="group" aria-label="Race time range">
+              <div className={`segmented ${styles.rangeSegmented}`} role="group" aria-label="Race time range">
                 <button
                   type="button"
-                  className={range === 'daily' ? 'seg-btn active' : 'seg-btn'}
+                  className={
+                    range === 'daily'
+                      ? `seg-btn ${styles.rangeSegBtn} active`
+                      : `seg-btn ${styles.rangeSegBtn}`
+                  }
                   onClick={() => setRange('daily')}
                 >
                   Day
                 </button>
                 <button
                   type="button"
-                  className={range === 'weekly' ? 'seg-btn active' : 'seg-btn'}
+                  className={
+                    range === 'weekly'
+                      ? `seg-btn ${styles.rangeSegBtn} active`
+                      : `seg-btn ${styles.rangeSegBtn}`
+                  }
                   onClick={() => setRange('weekly')}
                 >
                   Week
@@ -695,10 +704,10 @@ export function RacePage() {
               </div>
             </div>
 
-            <div className="race-controls-secondary">
+            <div className={styles.controlsSecondary}>
               <input
                 type="date"
-                className="race-date-input"
+                className={styles.dateInput}
                 aria-label="Race date"
                 value={date}
                 onChange={(e) => {
@@ -711,7 +720,7 @@ export function RacePage() {
               />
               <button
                 type="button"
-                className="btn btn-secondary btn-sm race-today-btn"
+                className={`btn btn-secondary btn-sm ${styles.todayBtn}`}
                 disabled={isToday}
                 onClick={() => {
                   setDate(getTodayIsoDate());
@@ -722,7 +731,7 @@ export function RacePage() {
               </button>
               <button
                 type="button"
-                className="btn btn-secondary btn-sm race-refresh-btn"
+                className={`btn btn-secondary btn-sm ${styles.refreshBtn}`}
                 disabled={raceQuery.isFetching}
                 onClick={() => void raceQuery.refetch()}
                 aria-label="Refresh race standings"
@@ -732,8 +741,8 @@ export function RacePage() {
                     : 'Refresh standings'
                 }
               >
-                <RefreshIcon size={16} className={raceQuery.isFetching ? 'icon-spin' : undefined} />
-                <span className="refresh-btn-text">
+                <RefreshIcon size={16} className={raceQuery.isFetching ? styles.iconSpin : undefined} />
+                <span className={styles.refreshBtnText}>
                   {raceData ? formatTime(raceQuery.dataUpdatedAt) : 'Sync'}
                 </span>
               </button>
@@ -758,10 +767,10 @@ export function RacePage() {
 
           {raceData && timeline && uiFrame && (
             <>
-              <section className="card velodrome-card">
+              <section className={`card ${styles.velodromeCard}`}>
                 <Suspense
                   fallback={
-                    <div className="velodrome-loading">
+                    <div className={styles.velodromeLoading}>
                       <div className="spinner" aria-hidden="true" />
                       <p className="muted small">Loading 3D Velodrome...</p>
                     </div>
@@ -815,9 +824,9 @@ export function RacePage() {
                 />
               </section>
 
-              <section className="card standings-card">
-                <div className="section-head standings-head">
-                  <div className="standings-title-group">
+              <section className={`card ${styles.standingsCard}`}>
+                <div className={`section-head ${styles.standingsHead}`}>
+                  <div className={styles.standingsTitleGroup}>
                     <h2>Standings</h2>
                     <span className="muted small">
                       {raceData.range === 'weekly'
@@ -825,35 +834,37 @@ export function RacePage() {
                         : raceData.date}
                     </span>
                   </div>
-                  <div className="standings-meta-right">
-                    <span className="muted small standings-hint">Tap a rider for breakdown</span>
+                  <div className={styles.standingsMetaRight}>
+                    <span className={`muted small ${styles.standingsHint}`}>
+                      Tap a rider for breakdown
+                    </span>
                     <code className="code-inline" title="Group invite code">
                       {raceData.group.inviteCode}
                     </code>
                   </div>
                 </div>
 
-                <div className="table-wrap">
-                  <table className="race-table">
+                <div className={styles.tableWrap}>
+                  <table className={styles.raceTable}>
                     <thead>
                       <tr>
-                        <th className="col-rank">Rank</th>
-                        <th className="col-racer">Racer</th>
-                        <th className="col-score">Score</th>
-                        <th className="col-steps col-desktop-only">Steps</th>
-                        <th className="col-calories col-desktop-only">Active Cal</th>
-                        <th className="col-sync col-desktop-only">Sync</th>
-                        <th className="col-chevron" aria-label="Details" />
+                        <th>Rank</th>
+                        <th>Racer</th>
+                        <th>Score</th>
+                        <th className={styles.colDesktopOnly}>Steps</th>
+                        <th className={styles.colDesktopOnly}>Active Cal</th>
+                        <th className={styles.colDesktopOnly}>Sync</th>
+                        <th className={styles.colChevron} aria-label="Details" />
                       </tr>
                     </thead>
                     <tbody>
                       {raceData.standings.map((row) => {
                         const isExpanded = expandedIds.has(row.userId);
                         const rowClasses = [
-                          'race-row-clickable',
-                          row.isCurrentUser ? 'row-current-user' : '',
-                          row.isLeader ? 'row-leader' : '',
-                          isExpanded ? 'row-expanded' : '',
+                          styles.raceRowClickable,
+                          row.isCurrentUser ? styles.rowCurrentUser : '',
+                          row.isLeader ? styles.rowLeader : '',
+                          isExpanded ? styles.rowExpanded : '',
                         ]
                           .filter(Boolean)
                           .join(' ');
@@ -873,43 +884,50 @@ export function RacePage() {
                                 }
                               }}
                             >
-                              <td className="col-rank">
-                                <div className="rank-cell">
-                                  <span className="rank-num">#{row.rank}</span>
+                              <td>
+                                <div className={styles.rankCell}>
+                                  <span className={styles.rankNum}>#{row.rank}</span>
                                   {row.isLeader && (
-                                    <span className="pill pill-gold pill-leader-badge" title="Current Leader">
+                                    <span
+                                      className={`pill pill-gold ${styles.pillLeaderBadge}`}
+                                      title="Current Leader"
+                                    >
                                       <TrophyIcon size={11} />
-                                      <span className="leader-word">Leader</span>
+                                      <span className={styles.leaderWord}>Leader</span>
                                     </span>
                                   )}
                                 </div>
                               </td>
-                              <td className="col-racer">
-                                <div className="racer-cell">
+                              <td>
+                                <div className={styles.racerCell}>
                                   <span
                                     className="color-dot"
                                     style={{ backgroundColor: row.bikeColor }}
                                     aria-hidden="true"
                                   />
-                                  <div className="racer-identity">
-                                    <div className="racer-name">
-                                      <strong className="racer-display-name">{row.displayName}</strong>
+                                  <div className={styles.racerIdentity}>
+                                    <div className={styles.racerName}>
+                                      <strong className={styles.racerDisplayName}>
+                                        {row.displayName}
+                                      </strong>
                                       {row.isCurrentUser && <span className="pill pill-blue">You</span>}
                                     </div>
-                                    <span className="muted small racer-slug">@{row.playerSlug}</span>
+                                    <span className={`muted small ${styles.racerSlug}`}>
+                                      @{row.playerSlug}
+                                    </span>
                                   </div>
                                 </div>
                               </td>
-                              <td className="col-score">
-                                <div className="score-cell">
+                              <td>
+                                <div className={styles.scoreCell}>
                                   <strong>{row.weightedScorePct.toFixed(1)}%</strong>
                                   {row.isOverdrive && (
                                     <span className="pill pill-overdrive">OVERDRIVE</span>
                                   )}
                                 </div>
-                                <div className="mini-bar" aria-hidden="true">
+                                <div className={styles.miniBar} aria-hidden="true">
                                   <div
-                                    className={`mini-bar-fill${row.isOverdrive ? ' overdrive' : ''}`}
+                                    className={`${styles.miniBarFill}${row.isOverdrive ? ` ${styles.overdrive}` : ''}`}
                                     style={{
                                       width: `${Math.min(100, Math.max(0, row.weightedScorePct))}%`,
                                       backgroundColor: row.isOverdrive ? undefined : row.bikeColor,
@@ -917,7 +935,7 @@ export function RacePage() {
                                   />
                                 </div>
                               </td>
-                              <td className="col-steps col-desktop-only">
+                              <td className={styles.colDesktopOnly}>
                                 <div>
                                   <strong>{row.steps.toLocaleString()}</strong>{' '}
                                   <span className="muted small">
@@ -926,7 +944,7 @@ export function RacePage() {
                                 </div>
                                 <span className="muted small">{row.stepPct.toFixed(1)}%</span>
                               </td>
-                              <td className="col-calories col-desktop-only">
+                              <td className={styles.colDesktopOnly}>
                                 <div>
                                   <strong>{row.activeCalories.toLocaleString()}</strong>{' '}
                                   <span className="muted small">
@@ -935,19 +953,23 @@ export function RacePage() {
                                 </div>
                                 <span className="muted small">{row.caloriePct.toFixed(1)}%</span>
                               </td>
-                              <td className="col-sync col-desktop-only muted small">
+                              <td className={`${styles.colDesktopOnly} muted small`}>
                                 {formatTime(row.lastUpdatedAt)}
                               </td>
-                              <td className="col-chevron">
+                              <td className={styles.colChevron}>
                                 <ChevronDownIcon
                                   size={18}
-                                  className={isExpanded ? 'row-chevron open' : 'row-chevron'}
+                                  className={
+                                    isExpanded
+                                      ? `${styles.rowChevron} ${styles.open}`
+                                      : styles.rowChevron
+                                  }
                                 />
                               </td>
                             </tr>
 
                             {isExpanded && (
-                              <tr className="breakdown-row">
+                              <tr className={styles.breakdownRow}>
                                 <td colSpan={7}>
                                   <RiderBreakdownPanel
                                     row={row}

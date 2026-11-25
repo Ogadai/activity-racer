@@ -1,0 +1,103 @@
+.loginCard {
+  width: 100%;
+  max-width: 480px;
+  padding: 2rem;
+}
+
+.badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-primary-subtle-text);
+  background: var(--color-primary-subtle-bg);
+  border: 1px solid var(--color-primary-subtle-border);
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  margin-bottom: 0.5rem;
+}
+
+.btnGoogle {
+  margin-top: 1.5rem;
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  background: var(--color-btn-oauth-bg);
+  color: var(--color-btn-oauth-text);
+  border: 1px solid var(--color-border-default);
+  border-radius: 10px;
+  padding: 0.75rem 1.25rem;
+  font-size: 0.98rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 3px var(--color-shadow-control);
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.btnGoogle:hover:not(:disabled) {
+  background: var(--color-btn-oauth-hover-bg);
+  box-shadow: 0 2px 6px var(--color-shadow-control-hover);
+}
+
+.btnGoogle:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.btnGoogle:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.setupBox {
+  margin-top: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.setupBox p {
+  margin: 0;
+}
+
+.loginFootnote {
+  margin: 1.25rem 0 0;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.healthFooter {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-border-subtle);
+  display: flex;
+  justify-content: center;
+}
+
+.healthPill {
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+}
+
+.healthPill.ok {
+  background: var(--color-success-subtle-bg);
+  color: var(--color-success-subtle-text);
+  border: 1px solid var(--color-success-subtle-border);
+}
+
+.healthPill.err {
+  background: var(--color-error-subtle-bg);
+  color: var(--color-error-subtle-text);
+  border: 1px solid var(--color-error-subtle-border);
+}
+
+@media (max-width: 640px) {
+  .loginCard {
+    padding: 0.85rem;
+  }
+}

@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useCreateGroup, useGroups, useJoinGroup } from '../api/queries';
+import styles from './GroupsPage.module.css';
 
 export function GroupsPage() {
   const groupsQuery = useGroups();
@@ -176,17 +177,17 @@ export function GroupsPage() {
         )}
 
         {groups.length > 0 && (
-          <div className="group-list">
+          <div className={styles.groupList}>
             {groups.map((group) => (
-              <article key={group.groupId} className="group-item">
-                <div className="group-item-main">
-                  <div className="group-title-row">
+              <article key={group.groupId} className={styles.groupItem}>
+                <div>
+                  <div className={styles.groupTitleRow}>
                     <h3>{group.name}</h3>
                     <span className={group.role === 'OWNER' ? 'pill pill-blue' : 'pill'}>
                       {group.role}
                     </span>
                   </div>
-                  <div className="group-meta-row">
+                  <div className={styles.groupMetaRow}>
                     <span className="muted small">Invite code:</span>
                     <code className="code-inline">{group.inviteCode}</code>
                     <button
@@ -198,7 +199,7 @@ export function GroupsPage() {
                     </button>
                   </div>
                 </div>
-                <div className="group-item-actions">
+                <div>
                   <Link
                     to={`/race?group=${encodeURIComponent(group.groupId)}`}
                     className="btn btn-primary btn-sm"

@@ -9,6 +9,7 @@ import {
   subscribeVoicesChanged,
 } from '../race/tts';
 import { CloseIcon, MicIcon, VolumeOffIcon, VolumeOnIcon } from './Icons';
+import styles from './RaceCommentaryTicker.module.css';
 
 interface RaceCommentaryTickerProps {
   enabled: boolean;
@@ -168,10 +169,10 @@ export function RaceCommentaryTicker({
 
   if (!enabled) {
     return (
-      <div className="commentary-ticker commentary-collapsed">
+      <div className={`${styles.ticker} ${styles.collapsed}`}>
         <button
           type="button"
-          className="commentary-enable-btn"
+          className={styles.enableBtn}
           onClick={onToggleEnabled}
         >
           <MicIcon size={15} />
@@ -185,39 +186,39 @@ export function RaceCommentaryTicker({
 
   return (
     <div
-      className={`commentary-ticker${isFinalDay && activeEntry ? ' final-day' : ''}`}
+      className={`${styles.ticker}${isFinalDay && activeEntry ? ` ${styles.finalDay}` : ''}`}
       role="status"
       aria-live="polite"
     >
-      <div className="commentary-body">
+      <div className={styles.body}>
         {isPending && !data && (
-          <p className="commentary-text muted">Tuning into the velodrome booth...</p>
+          <p className={`${styles.text} muted`}>Tuning into the velodrome booth...</p>
         )}
 
         {!isPending && isNotConfigured && (
-          <p className="commentary-text muted">
+          <p className={`${styles.text} muted`}>
             AI Announcer ready once your Gemini key is saved in SSM (
             <code className="code-inline">/activity-racer/gemini-api-key</code>).
           </p>
         )}
 
         {!isPending && Boolean(error) && !isNotConfigured && (
-          <p className="commentary-text muted">
+          <p className={`${styles.text} muted`}>
             {error instanceof Error ? error.message : 'Race commentary temporarily unavailable.'}
           </p>
         )}
 
         {activeEntry && (
-          <p key={activeEntry.date} className="commentary-text commentary-fade-in">
+          <p key={activeEntry.date} className={`${styles.text} ${styles.fadeIn}`}>
             {activeEntry.commentary}
           </p>
         )}
       </div>
 
-      <div className="commentary-actions" ref={actionsWrapRef}>
+      <div className={styles.actions} ref={actionsWrapRef}>
         <button
           type="button"
-          className="btn btn-secondary btn-xs commentary-icon-btn"
+          className={`btn btn-secondary btn-xs ${styles.iconBtn}`}
           onClick={() => {
             setVoiceMenuOpen(false);
             onToggleEnabled();
@@ -231,7 +232,7 @@ export function RaceCommentaryTicker({
         {hasSpeechSynthesis() && (
           <button
             type="button"
-            className={`btn btn-secondary btn-xs commentary-icon-btn${ttsEnabled ? ' active' : ''}`}
+            className={`btn btn-secondary btn-xs ${styles.iconBtn}${ttsEnabled ? ` ${styles.active}` : ''}`}
             onClick={handleSpeakerClick}
             aria-pressed={ttsEnabled}
             aria-expanded={voiceMenuOpen}
@@ -245,30 +246,30 @@ export function RaceCommentaryTicker({
 
         {voiceMenuOpen && voiceList.voices.length > 0 && (
           <div
-            className="voice-popover"
+            className={styles.voicePopover}
             role="menu"
             aria-label={`Select voice (${voiceList.locale})`}
           >
-            <div className="voice-popover-head">
+            <div className={styles.voicePopoverHead}>
               <span>Voice ({voiceList.locale})</span>
               <button
                 type="button"
-                className="voice-popover-close"
+                className={styles.voicePopoverClose}
                 onClick={() => setVoiceMenuOpen(false)}
                 aria-label="Close voice menu"
               >
                 Done
               </button>
             </div>
-            <div className="voice-popover-list">
+            <div className={styles.voicePopoverList}>
               <button
                 type="button"
                 role="menuitemradio"
                 aria-checked={ttsVoiceUri === null}
-                className={`voice-option-btn${ttsVoiceUri === null ? ' selected' : ''}`}
+                className={`${styles.voiceOptionBtn}${ttsVoiceUri === null ? ` ${styles.selected}` : ''}`}
                 onClick={() => handleChooseVoice(null)}
               >
-                <span className="voice-option-name">Browser Default</span>
+                <span className={styles.voiceOptionName}>Browser Default</span>
               </button>
               {voiceList.voices.map((voice) => {
                 const isSelected = ttsVoiceUri === voice.voiceURI;
@@ -278,11 +279,11 @@ export function RaceCommentaryTicker({
                     type="button"
                     role="menuitemradio"
                     aria-checked={isSelected}
-                    className={`voice-option-btn${isSelected ? ' selected' : ''}`}
+                    className={`${styles.voiceOptionBtn}${isSelected ? ` ${styles.selected}` : ''}`}
                     onClick={() => handleChooseVoice(voice.voiceURI)}
                   >
-                    <span className="voice-option-name">{voice.name}</span>
-                    <span className="voice-option-lang">{voice.lang}</span>
+                    <span className={styles.voiceOptionName}>{voice.name}</span>
+                    <span className={styles.voiceOptionLang}>{voice.lang}</span>
                   </button>
                 );
               })}

@@ -1,0 +1,159 @@
+.navbar {
+  background: var(--color-bg-surface);
+  border-bottom: 1px solid var(--color-border-subtle);
+  position: sticky;
+  top: 0;
+  z-index: 700;
+}
+
+.navbarInner {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 0.55rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: nowrap;
+}
+
+.navbarLeft {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  min-width: 0;
+  flex-wrap: nowrap;
+}
+
+.navbarRight {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-shrink: 0;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.brandBadge {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  flex-shrink: 0;
+}
+
+.brandText {
+  display: inline;
+}
+
+.navLinks {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-wrap: nowrap;
+}
+
+.navLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.38rem 0.72rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.navLink:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.navLink:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.navLink.active {
+  background: var(--color-primary-subtle-bg);
+  color: var(--color-primary-subtle-text);
+  font-weight: 600;
+}
+
+.navSignoutBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.navSignoutLabel {
+  display: inline;
+}
+
+.userPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: var(--color-bg-surface-subtle);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 999px;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.userPillName {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .brandText,
+  .userPill,
+  .navSignoutLabel {
+    display: none;
+  }
+
+  .navbarInner {
+    padding: 0.45rem 0.75rem;
+    gap: 0.5rem;
+  }
+
+  .navbarLeft {
+    gap: 0.55rem;
+  }
+
+  .navLink {
+    padding: 0.36rem 0.55rem;
+    font-size: 0.84rem;
+    gap: 0.28rem;
+  }
+
+  .navSignoutBtn {
+    padding: 0.38rem 0.5rem;
+  }
+}
+
+@media (max-width: 400px) {
+  .navLink {
+    padding: 0.34rem 0.44rem;
+    font-size: 0.78rem;
+  }
+}

@@ -6,6 +6,7 @@ import {
 } from '@activity-racer/shared';
 import { useProfile, useUpdateProfile } from '../api/queries';
 import { useAuth } from '../auth/AuthContext';
+import styles from './SettingsPage.module.css';
 
 function buildHomeAssistantRestCommandYaml(
   statsUrl: string,
@@ -232,15 +233,15 @@ export function SettingsPage() {
 
           <div className="field">
             <span>Bike Color</span>
-            <div className="swatch-row">
+            <div className={styles.swatchRow}>
               {BIKE_COLOR_PALETTE.map((hex) => (
                 <button
                   key={hex}
                   type="button"
                   className={
                     bikeColor.toLowerCase() === hex.toLowerCase()
-                      ? 'color-swatch selected'
-                      : 'color-swatch'
+                      ? `${styles.colorSwatch} ${styles.selected}`
+                      : styles.colorSwatch
                   }
                   style={{ backgroundColor: hex }}
                   onClick={() => setBikeColor(hex)}
@@ -253,7 +254,7 @@ export function SettingsPage() {
                 value={HEX_COLOR_REGEX.test(bikeColor) ? bikeColor : '#5288b5'}
                 onChange={(e) => setBikeColor(e.target.value)}
                 aria-label="Custom bike color"
-                className="color-picker-input"
+                className={styles.colorPickerInput}
               />
               <code className="code-inline">{bikeColor}</code>
             </div>
@@ -288,7 +289,7 @@ export function SettingsPage() {
           </div>
 
           <div className="field">
-            <div className="slider-head">
+            <div className={styles.sliderHead}>
               <span>Metric Weighting (always sums to 100%)</span>
               <strong>
                 Steps {stepWeightPct}% · Active Calories {calorieWeightPct}%
@@ -302,7 +303,7 @@ export function SettingsPage() {
               value={stepWeightPct}
               onChange={(e) => setStepWeightPct(Number(e.target.value))}
             />
-            <p className="formula-preview">
+            <p className={styles.formulaPreview}>
               Formula: <code>{stepWeightPct}%</code> × (steps ÷{' '}
               <code>{Number(dailyStepTarget || 0).toLocaleString()}</code>) +{' '}
               <code>{calorieWeightPct}%</code> × (active kcal ÷{' '}
@@ -325,9 +326,9 @@ export function SettingsPage() {
           your personal API key.
         </p>
 
-        <div className="webhook-meta">
-          <div className="webhook-row">
-            <span className="webhook-label">Endpoint</span>
+        <div className={styles.webhookMeta}>
+          <div className={styles.webhookRow}>
+            <span className={styles.webhookLabel}>Endpoint</span>
             <div className="copy-row">
               <code className="code-inline">{statsUrl}</code>
               <button
@@ -340,8 +341,8 @@ export function SettingsPage() {
             </div>
           </div>
 
-          <div className="webhook-row">
-            <span className="webhook-label">x-api-key</span>
+          <div className={styles.webhookRow}>
+            <span className={styles.webhookLabel}>x-api-key</span>
             <div className="copy-row">
               <code className="code-inline">
                 {revealKey ? profile.webhookApiKey : maskedKey}
@@ -369,7 +370,7 @@ export function SettingsPage() {
                   Rotate Key
                 </button>
               ) : (
-                <span className="inline-confirm">
+                <span className={styles.inlineConfirm}>
                   <button
                     type="button"
                     className="btn btn-danger btn-xs"
@@ -391,11 +392,11 @@ export function SettingsPage() {
           </div>
         </div>
 
-        <div className="yaml-section">
+        <div className={styles.yamlSection}>
           <div className="section-head">
             <h3>1. Add REST Command</h3>
-            <div className="inline-controls">
-              <label className="checkbox-label">
+            <div className={styles.inlineControls}>
+              <label className={styles.checkboxLabel}>
                 <input
                   type="checkbox"
                   checked={useSecretsRef}
@@ -412,12 +413,12 @@ export function SettingsPage() {
               </button>
             </div>
           </div>
-          <pre className="code-block">
+          <pre className={styles.codeBlock}>
             <code>{restCommandYaml}</code>
           </pre>
         </div>
 
-        <div className="yaml-section">
+        <div className={styles.yamlSection}>
           <div className="section-head">
             <h3>2. Schedule Sync Automation</h3>
             <button
@@ -428,12 +429,12 @@ export function SettingsPage() {
               {copiedTarget === 'auto' ? 'Copied!' : 'Copy YAML'}
             </button>
           </div>
-          <pre className="code-block">
+          <pre className={styles.codeBlock}>
             <code>{automationYaml}</code>
           </pre>
         </div>
 
-        <div className="yaml-section">
+        <div className={styles.yamlSection}>
           <div className="section-head">
             <h3>3. Quick Test via curl</h3>
             <button
@@ -444,7 +445,7 @@ export function SettingsPage() {
               {copiedTarget === 'curl' ? 'Copied!' : 'Copy curl'}
             </button>
           </div>
-          <pre className="code-block">
+          <pre className={styles.codeBlock}>
             <code>{curlSnippet}</code>
           </pre>
         </div>

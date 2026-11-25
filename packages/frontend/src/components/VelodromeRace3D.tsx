@@ -21,6 +21,7 @@ import {
   TrophyIcon,
 } from './Icons';
 import type { PlaybackSpeed } from './PlaybackControls';
+import styles from './VelodromeRace3D.module.css';
 
 export type CameraMode = 'stadium' | 'top' | 'leader' | 'me';
 
@@ -165,7 +166,7 @@ export default function VelodromeRace3D({
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.06;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.domElement.className = 'velodrome-canvas';
+    renderer.domElement.className = styles.canvas;
     renderer.domElement.setAttribute('aria-label', '3D Velodrome Bike Race');
 
     stageEl.innerHTML = '';
@@ -457,7 +458,7 @@ export default function VelodromeRace3D({
 
   if (webglError) {
     return (
-      <div className="velodrome-fallback">
+      <div className={styles.fallback}>
         <div className="alert alert-info">
           <strong>3D Velodrome unavailable:</strong> {webglError} The timeline HUD and full
           interactive standings table below remain available.
@@ -466,75 +467,82 @@ export default function VelodromeRace3D({
     );
   }
 
+  const camBtnClass = (mode: CameraMode) =>
+    cameraMode === mode ? `seg-btn ${styles.camBtn} active` : `seg-btn ${styles.camBtn}`;
+
   return (
-    <div className="velodrome-shell">
-      <div className="velodrome-toolbar">
-        <div className="segmented cam-segmented" role="group" aria-label="Camera perspective">
+    <div className={styles.shell}>
+      <div className={styles.toolbar}>
+        <div className={`segmented ${styles.camSegmented}`} role="group" aria-label="Camera perspective">
           <button
             type="button"
-            className={cameraMode === 'stadium' ? 'seg-btn cam-btn active' : 'seg-btn cam-btn'}
+            className={camBtnClass('stadium')}
             onClick={() => onCameraModeChange('stadium')}
             title="3D Stadium view"
             aria-label="3D Stadium view"
           >
             <StadiumIcon size={15} />
-            <span className="cam-btn-label">3D</span>
+            <span className={styles.camBtnLabel}>3D</span>
           </button>
           <button
             type="button"
-            className={cameraMode === 'top' ? 'seg-btn cam-btn active' : 'seg-btn cam-btn'}
+            className={camBtnClass('top')}
             onClick={() => onCameraModeChange('top')}
             title="Top-Down view"
             aria-label="Top-Down view"
           >
             <TopDownIcon size={15} />
-            <span className="cam-btn-label">Top</span>
+            <span className={styles.camBtnLabel}>Top</span>
           </button>
           <button
             type="button"
-            className={cameraMode === 'leader' ? 'seg-btn cam-btn active' : 'seg-btn cam-btn'}
+            className={camBtnClass('leader')}
             onClick={() => onCameraModeChange('leader')}
             title="Follow Leader"
             aria-label="Follow Leader"
           >
             <TrophyIcon size={15} />
-            <span className="cam-btn-label">Leader</span>
+            <span className={styles.camBtnLabel}>Leader</span>
           </button>
           {hasCurrentUser && (
             <button
               type="button"
-              className={cameraMode === 'me' ? 'seg-btn cam-btn active' : 'seg-btn cam-btn'}
+              className={camBtnClass('me')}
               onClick={() => onCameraModeChange('me')}
               title="Follow Me"
               aria-label="Follow Me"
             >
               <MyLocationIcon size={15} />
-              <span className="cam-btn-label">Me</span>
+              <span className={styles.camBtnLabel}>Me</span>
             </button>
           )}
         </div>
 
         <button
           type="button"
-          className={showLabels ? 'btn btn-secondary btn-xs label-toggle-btn active' : 'btn btn-secondary btn-xs label-toggle-btn'}
+          className={
+            showLabels
+              ? `btn btn-secondary btn-xs ${styles.labelToggleBtn} ${styles.active}`
+              : `btn btn-secondary btn-xs ${styles.labelToggleBtn}`
+          }
           onClick={onToggleLabels}
           aria-pressed={showLabels}
           aria-label={showLabels ? 'Hide rider labels' : 'Show rider labels'}
           title={showLabels ? 'Hide Labels' : 'Show Labels'}
         >
           {showLabels ? <LabelIcon size={15} /> : <LabelOffIcon size={15} />}
-          <span className="label-toggle-text">{showLabels ? 'Labels' : 'Hidden'}</span>
+          <span className={styles.labelToggleText}>{showLabels ? 'Labels' : 'Hidden'}</span>
         </button>
       </div>
 
-      <div className="velodrome-viewport">
-        <div ref={stageRef} className="velodrome-stage" />
+      <div className={styles.viewport}>
+        <div ref={stageRef} className={styles.stage} />
 
-        <div className="velodrome-overlay" aria-hidden="true">
+        <div className={styles.overlay} aria-hidden="true">
           {riderRoster.map((rider) => (
             <div
               key={rider.userId}
-              className={`rider-nameplate${rider.isCurrentUser ? ' is-self' : ''}`}
+              className={`${styles.riderNameplate}${rider.isCurrentUser ? ` ${styles.isSelf}` : ''}`}
               ref={(el) => {
                 const existing = labelRefsMap.current.get(rider.userId) ?? {
                   container: null,
@@ -546,9 +554,9 @@ export default function VelodromeRace3D({
                 labelRefsMap.current.set(rider.userId, existing);
               }}
             >
-              <div className="nameplate-row">
+              <div className={styles.nameplateRow}>
                 <span
-                  className="nameplate-leader"
+                  className={styles.nameplateLeader}
                   hidden
                   ref={(el) => {
                     const existing = labelRefsMap.current.get(rider.userId);
@@ -561,12 +569,14 @@ export default function VelodromeRace3D({
                   className="color-dot"
                   style={{ backgroundColor: rider.bikeColor }}
                 />
-                <span className="nameplate-name">{rider.displayName}</span>
-                {rider.isCurrentUser && <span className="nameplate-pill self">You</span>}
+                <span className={styles.nameplateName}>{rider.displayName}</span>
+                {rider.isCurrentUser && (
+                  <span className={`${styles.nameplatePill} ${styles.self}`}>You</span>
+                )}
               </div>
-              <div className="nameplate-meta">
+              <div className={styles.nameplateMeta}>
                 <span
-                  className="nameplate-score"
+                  className={styles.nameplateScore}
                   ref={(el) => {
                     const existing = labelRefsMap.current.get(rider.userId);
                     if (existing) existing.score = el;
@@ -575,7 +585,7 @@ export default function VelodromeRace3D({
                   0%
                 </span>
                 <span
-                  className="nameplate-pill overdrive"
+                  className={`${styles.nameplatePill} ${styles.overdrive}`}
                   hidden
                   ref={(el) => {
                     const existing = labelRefsMap.current.get(rider.userId);
@@ -590,10 +600,10 @@ export default function VelodromeRace3D({
         </div>
 
         {playOverlayMode !== 'hidden' && (
-          <div className="velodrome-play-backdrop">
+          <div className={styles.playBackdrop}>
             <button
               type="button"
-              className={`velodrome-play-btn${playOverlayMode === 'loading' ? ' loading' : ''}`}
+              className={styles.playBtn}
               onClick={onPlayOverlayClick}
               aria-label={
                 playOverlayMode === 'replay'
@@ -604,13 +614,13 @@ export default function VelodromeRace3D({
               }
             >
               {playOverlayMode === 'loading' ? (
-                <span className="play-overlay-spinner" aria-hidden="true" />
+                <span className={styles.playOverlaySpinner} aria-hidden="true" />
               ) : playOverlayMode === 'replay' ? (
                 <ReplayIcon size={38} />
               ) : (
                 <PlayIcon size={42} />
               )}
-              <span className="velodrome-play-caption">
+              <span className={styles.playCaption}>
                 {playOverlayMode === 'loading'
                   ? 'Loading...'
                   : playOverlayMode === 'replay'

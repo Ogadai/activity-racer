@@ -1,0 +1,105 @@
+.sliderHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.formulaPreview {
+  margin: 0.25rem 0 0;
+  font-size: 0.84rem;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-surface-subtle);
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--color-border-subtle);
+}
+
+.swatchRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.colorSwatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  cursor: pointer;
+}
+
+.colorSwatch.selected {
+  border-color: var(--color-swatch-selected-border);
+  box-shadow: 0 0 0 2px var(--color-swatch-selected-ring) inset;
+}
+
+.colorPickerInput {
+  width: 34px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  cursor: pointer;
+  background: transparent;
+}
+
+.webhookMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 1rem 0 1.25rem;
+  padding: 1rem;
+  background: var(--color-bg-surface-subtle);
+  border-radius: 10px;
+  border: 1px solid var(--color-border-subtle);
+}
+
+.webhookRow {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.webhookLabel {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+}
+
+.inlineConfirm,
+.inlineControls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.checkboxLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.84rem;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.yamlSection {
+  margin-top: 1.25rem;
+}
+
+.codeBlock {
+  margin: 0;
+  padding: 1rem;
+  background: var(--color-bg-code-block);
+  color: var(--color-text-code-block);
+  border: 1px solid var(--color-border-code-block);
+  border-radius: 10px;
+  overflow-x: auto;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
