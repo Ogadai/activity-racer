@@ -104,7 +104,7 @@
   display: inline;
 }
 
-.userPill {
+.userSettingsLink {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
@@ -114,10 +114,29 @@
   padding: 0.3rem 0.75rem;
   font-size: 0.85rem;
   font-weight: 500;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.userSettingsLink:hover {
+  background: var(--color-bg-hover);
   color: var(--color-text-primary);
 }
 
-.userPillName {
+.userSettingsLink:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.userSettingsLink.active {
+  background: var(--color-primary-subtle-bg);
+  border-color: var(--color-primary-subtle-bg);
+  color: var(--color-primary-subtle-text);
+  font-weight: 600;
+}
+
+.userSettingsName {
   max-width: 160px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -126,7 +145,7 @@
 
 @media (max-width: 760px) {
   .brandText,
-  .userPill,
+  .userSettingsName,
   .navSignoutLabel {
     display: none;
   }
@@ -146,6 +165,7 @@
     gap: 0.28rem;
   }
 
+  .userSettingsLink,
   .navSignoutBtn {
     padding: 0.38rem 0.5rem;
   }

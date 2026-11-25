@@ -38,18 +38,21 @@ export function NavBar() {
               <GroupsIcon size={16} />
               <span>Groups</span>
             </NavLink>
-            <NavLink to="/settings" className={navLinkClass}>
-              <SettingsIcon size={16} />
-              <span>Settings</span>
-            </NavLink>
           </nav>
         </div>
 
         <div className={styles.navbarRight}>
-          <span className={styles.userPill} title={user?.email ?? displayLabel}>
-            <span className="color-dot" style={{ backgroundColor: bikeColor }} aria-hidden="true" />
-            <span className={styles.userPillName}>{displayLabel}</span>
-          </span>
+          <NavLink
+            to="/settings"
+            className={({ isActive }) =>
+              isActive ? `${styles.userSettingsLink} ${styles.active}` : styles.userSettingsLink
+            }
+            aria-label={`Settings (${displayLabel})`}
+            title={`Settings — ${user?.email ?? displayLabel}`}
+          >
+            <SettingsIcon size={16} />
+            <span className={styles.userSettingsName}>{displayLabel}</span>
+          </NavLink>
           <button
             type="button"
             className={`btn btn-secondary btn-sm ${styles.navSignoutBtn}`}
