@@ -10,6 +10,10 @@ export interface RuntimeConfig {
   region: string;
   userPoolId?: string;
   userPoolClientId?: string;
+  cognitoDomain?: string;
+  googleAuthEnabled?: boolean;
+  callbackPath?: string;
+  logoutPath?: string;
   hostingMode?: 'cloudfront' | 'apigw-lambda-s3';
 }
 

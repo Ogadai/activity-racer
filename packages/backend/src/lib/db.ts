@@ -124,7 +124,10 @@ function pickInitialBikeColor(userId: string): string {
   return BIKE_COLOR_PALETTE[hash[0] % BIKE_COLOR_PALETTE.length];
 }
 
-function buildInitialDisplayName(email?: string): string {
+function buildInitialDisplayName(email?: string, name?: string): string {
+  if (name && name.trim().length > 0) {
+    return name.trim().slice(0, 40);
+  }
   if (!email) {
     return 'Racer';
   }
@@ -171,6 +174,7 @@ export async function getPlayerProfileItem(userId: string): Promise<PlayerProfil
 export async function ensurePlayerProfile(
   userId: string,
   email?: string,
+  name?: string,
 ): Promise<PlayerProfileItem> {
   const existing = await getPlayerProfileItem(userId);
   if (existing) {
@@ -179,7 +183,7 @@ export async function ensurePlayerProfile(
 
   const tableName = getTableName();
   const now = new Date().toISOString();
-  const displayName = buildInitialDisplayName(email);
+  const displayName = buildInitialDisplayName(email, name);
   const bikeColor = pickInitialBikeColor(userId);
 
   for (let attempt = 0; attempt < 3; attempt++) {

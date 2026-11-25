@@ -5,6 +5,7 @@ import { HttpError } from './http';
 export interface AuthClaims {
   userId: string;
   email?: string;
+  name?: string;
 }
 
 export function getAuthClaims(event: APIGatewayProxyEventV2WithJWTAuthorizer): AuthClaims {
@@ -16,7 +17,9 @@ export function getAuthClaims(event: APIGatewayProxyEventV2WithJWTAuthorizer): A
   }
 
   const email = typeof claims?.email === 'string' ? claims.email : undefined;
-  return { userId: sub, email };
+  const rawName = typeof claims?.name === 'string' ? claims.name.trim() : '';
+  const name = rawName.length > 0 ? rawName : undefined;
+  return { userId: sub, email, name };
 }
 
 export function getHeader(event: APIGatewayProxyEventV2, headerName: string): string | undefined {

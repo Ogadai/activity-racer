@@ -1,91 +1,42 @@
-import { useEffect, useState } from 'react';
-import type { HealthResponse, RuntimeConfig } from '@activity-racer/shared';
-import { loadRuntimeConfig } from './config';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { AuthProvider } from './auth/AuthContext';
+import { ProtectedRoute } from './components/ProtectedRoute';
+import { AuthCallbackPage } from './pages/AuthCallbackPage';
+import { GroupsPage } from './pages/GroupsPage';
+import { LoginPage } from './pages/LoginPage';
+import { RacePage } from './pages/RacePage';
+import { SettingsPage } from './pages/SettingsPage';
 
-type LoadState =
-  | { status: 'loading' }
-  | { status: 'ready'; config: RuntimeConfig; health: HealthResponse }
-  | { status: 'error'; message: string };
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 export function App() {
-  const [state, setState] = useState<LoadState>({ status: 'loading' });
-
-  const checkHealth = async () => {
-    setState({ status: 'loading' });
-    try {
-      const config = await loadRuntimeConfig();
-      const res = await fetch(`${config.apiUrl}/health`);
-      if (!res.ok) {
-        throw new Error(`Health endpoint returned HTTP ${res.status}`);
-      }
-      const health = (await res.json()) as HealthResponse;
-      setState({ status: 'ready', config, health });
-    } catch (err) {
-      setState({
-        status: 'error',
-        message: err instanceof Error ? err.message : 'Unknown error',
-      });
-    }
-  };
-
-  useEffect(() => {
-    void checkHealth();
-  }, []);
-
   return (
-    <main className="page">
-      <section className="card">
-        <span className="badge">Phase 1 · Walking Skeleton</span>
-        <h1>Activity Racer</h1>
-        <p className="subtitle">
-          End-to-end check: Private S3 SPA → HTTPS API Gateway → AWS Lambda
-        </p>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <AuthProvider>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
-        {state.status === 'loading' && (
-          <div className="status status-loading">Checking API health...</div>
-        )}
+            <Route element={<ProtectedRoute />}>
+              <Route path="/race" element={<RacePage />} />
+              <Route path="/groups" element={<GroupsPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+            </Route>
 
-        {state.status === 'ready' && (
-          <div className="status status-ok">
-            <strong>API Connected</strong>
-            <dl className="meta">
-              <div>
-                <dt>Service</dt>
-                <dd>{state.health.service}</dd>
-              </div>
-              <div>
-                <dt>Region</dt>
-                <dd>{state.health.region}</dd>
-              </div>
-              {state.config.hostingMode && (
-                <div>
-                  <dt>SPA Hosting</dt>
-                  <dd>{state.config.hostingMode}</dd>
-                </div>
-              )}
-              <div>
-                <dt>API Endpoint</dt>
-                <dd>{state.config.apiUrl}</dd>
-              </div>
-              <div>
-                <dt>Server Time</dt>
-                <dd>{state.health.timestamp}</dd>
-              </div>
-            </dl>
-          </div>
-        )}
-
-        {state.status === 'error' && (
-          <div className="status status-error">
-            <strong>Connection Error</strong>
-            <p>{state.message}</p>
-          </div>
-        )}
-
-        <button type="button" className="btn" onClick={() => void checkHealth()}>
-          Re-check Health
-        </button>
-      </section>
-    </main>
+            <Route path="/" element={<Navigate to="/race" replace />} />
+            <Route path="*" element={<Navigate to="/race" replace />} />
+          </Routes>
+        </AuthProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
   );
 }

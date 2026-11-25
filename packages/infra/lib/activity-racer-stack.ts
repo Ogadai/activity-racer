@@ -18,8 +18,16 @@ export class ActivityRacerStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    // Toggle CloudFront via `-c enableCloudFront=true` once AWS Support unlocks CloudFront
+    // Feature flags via CDK context (`-c enableCloudFront=true`, `-c enableGoogleAuth=true`)
     const enableCloudFront = this.node.tryGetContext('enableCloudFront') === 'true';
+    const enableGoogleAuth = this.node.tryGetContext('enableGoogleAuth') === 'true';
+    const explicitDomainPrefix = this.node.tryGetContext('cognitoDomainPrefix') as
+      | string
+      | undefined;
+    const cognitoDomainPrefix = explicitDomainPrefix?.trim() || `activity-racer-${cdk.Aws.ACCOUNT_ID}`;
+
+    const callbackPath = '/auth/callback';
+    const logoutPath = '/login';
 
     // 1. Single-table DynamoDB store (on-demand, zero idle cost, clean dev teardown)
     const table = new dynamodb.Table(this, 'ActivityRacerTable', {
@@ -36,12 +44,81 @@ export class ActivityRacerStack extends cdk.Stack {
       projectionType: dynamodb.ProjectionType.ALL,
     });
 
-    // 2. Amazon Cognito User Pool + Public SPA Client
-    // Non-production dev exception: 8+ char password policy & MFA OFF for low-friction testing.
-    // Structured with mutable email & EMAIL_ONLY recovery for future Google federation ($0 SMS).
+    // 2. API Gateway HTTP API + Private S3 SPA Bucket (created before Cognito Client so callback URLs are known)
+    const httpApi = new apigwv2.HttpApi(this, 'ActivityRacerApi', {
+      apiName: 'activity-racer-api',
+      corsPreflight: {
+        allowHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
+        allowMethods: [
+          apigwv2.CorsHttpMethod.GET,
+          apigwv2.CorsHttpMethod.POST,
+          apigwv2.CorsHttpMethod.PUT,
+          apigwv2.CorsHttpMethod.OPTIONS,
+        ],
+        allowOrigins: ['*'],
+      },
+    });
+
+    const apiBaseUrl = `${httpApi.apiEndpoint}/api`;
+
+    const siteBucket = new s3.Bucket(this, 'FrontendBucket', {
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      enforceSSL: true,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      autoDeleteObjects: true,
+    });
+
+    let distribution: cloudfront.Distribution | undefined;
+    let frontendUrl: string;
+
+    if (enableCloudFront) {
+      // Production-preferred path: CloudFront OAC in front of private S3 (no Lambda@Edge)
+      const s3Origin = origins.S3BucketOrigin.withOriginAccessControl(siteBucket);
+
+      distribution = new cloudfront.Distribution(this, 'FrontendDistribution', {
+        comment: 'Activity Racer SPA distribution',
+        defaultRootObject: 'index.html',
+        defaultBehavior: {
+          origin: s3Origin,
+          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+        },
+        additionalBehaviors: {
+          '/config.json': {
+            origin: s3Origin,
+            viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+            cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+          },
+        },
+        errorResponses: [
+          {
+            httpStatus: 403,
+            responseHttpStatus: 200,
+            responsePagePath: '/index.html',
+            ttl: cdk.Duration.seconds(0),
+          },
+          {
+            httpStatus: 404,
+            responseHttpStatus: 200,
+            responsePagePath: '/index.html',
+            ttl: cdk.Duration.seconds(0),
+          },
+        ],
+      });
+
+      frontendUrl = `https://${distribution.distributionDomainName}`;
+    } else {
+      frontendUrl = httpApi.apiEndpoint;
+    }
+
+    // 3. Amazon Cognito User Pool, Managed Login v2 Domain & OAuth 2.0 PKCE Public SPA Client
+    // Note: selfSignUpEnabled is false to prevent public email/password registration;
+    // federated Google sign-ins still auto-provision users on first login.
+    // Standard attributes remain unchanged from Phase 2 to avoid User Pool replacement.
     const userPool = new cognito.UserPool(this, 'ActivityRacerUserPool', {
       userPoolName: 'activity-racer-users',
-      selfSignUpEnabled: true,
+      selfSignUpEnabled: false,
       signInAliases: { email: true },
       autoVerify: { email: true },
       standardAttributes: {
@@ -59,12 +136,42 @@ export class ActivityRacerStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
+    const userPoolDomain = userPool.addDomain('ActivityRacerDomain', {
+      cognitoDomain: {
+        domainPrefix: cognitoDomainPrefix,
+      },
+      managedLoginVersion: cognito.ManagedLoginVersion.NEWER_MANAGED_LOGIN,
+    });
+
+    const cognitoDomainUrl = userPoolDomain.baseUrl();
+
+    const callbackUrls = [
+      `${frontendUrl}${callbackPath}`,
+      `http://localhost:5173${callbackPath}`,
+    ];
+    const logoutUrls = [`${frontendUrl}${logoutPath}`, `http://localhost:5173${logoutPath}`];
+
     const userPoolClient = userPool.addClient('ActivityRacerSpaClient', {
       userPoolClientName: 'activity-racer-spa',
-      generateSecret: false, // Required for public browser SPA clients
+      generateSecret: false, // Required for public browser SPA clients (PKCE)
       authFlows: {
-        userSrp: true,
-        adminUserPassword: true, // IAM-only flow for CLI smoke testing
+        userSrp: false,
+        adminUserPassword: true, // IAM-only flow retained for CLI smoke testing
+      },
+      supportedIdentityProviders: enableGoogleAuth
+        ? [cognito.UserPoolClientIdentityProvider.GOOGLE]
+        : [cognito.UserPoolClientIdentityProvider.COGNITO],
+      oAuth: {
+        flows: {
+          authorizationCodeGrant: true,
+        },
+        scopes: [
+          cognito.OAuthScope.OPENID,
+          cognito.OAuthScope.EMAIL,
+          cognito.OAuthScope.PROFILE,
+        ],
+        callbackUrls,
+        logoutUrls,
       },
       enableTokenRevocation: true,
       preventUserExistenceErrors: true,
@@ -72,6 +179,18 @@ export class ActivityRacerStack extends cdk.Stack {
       idTokenValidity: cdk.Duration.hours(1),
       refreshTokenValidity: cdk.Duration.days(30),
     });
+
+    // Managed login v2 requires an explicit branding style per app client when created via IaC/API
+    const managedLoginBranding = new cognito.CfnManagedLoginBranding(
+      this,
+      'ActivityRacerSpaBranding',
+      {
+        userPoolId: userPool.userPoolId,
+        clientId: userPoolClient.userPoolClientId,
+        useCognitoProvidedValues: true,
+      },
+    );
+    managedLoginBranding.node.addDependency(userPoolDomain);
 
     // Helper to create consistent ARM64 Node.js 22 Lambdas with explicit 7-day LogGroups
     const createApiLambda = (
@@ -101,7 +220,7 @@ export class ActivityRacerStack extends cdk.Stack {
       });
     };
 
-    // 3. API Lambdas with least-privilege DynamoDB grants
+    // 4. API Lambdas with least-privilege DynamoDB grants
     const healthFn = createApiLambda('Health', 'health.ts');
 
     const ingestStatsFn = createApiLambda('IngestStats', 'ingestStats.ts', {
@@ -124,21 +243,7 @@ export class ActivityRacerStack extends cdk.Stack {
     });
     table.grantReadData(raceFn);
 
-    // 4. API Gateway HTTP API + Built-in Cognito JWT Authorizer
-    const httpApi = new apigwv2.HttpApi(this, 'ActivityRacerApi', {
-      apiName: 'activity-racer-api',
-      corsPreflight: {
-        allowHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
-        allowMethods: [
-          apigwv2.CorsHttpMethod.GET,
-          apigwv2.CorsHttpMethod.POST,
-          apigwv2.CorsHttpMethod.PUT,
-          apigwv2.CorsHttpMethod.OPTIONS,
-        ],
-        allowOrigins: ['*'],
-      },
-    });
-
+    // 5. Built-in Cognito JWT Authorizer & API Routes
     const jwtAuthorizer = new authorizers.HttpUserPoolAuthorizer(
       'CognitoJwtAuthorizer',
       userPool,
@@ -192,17 +297,7 @@ export class ActivityRacerStack extends cdk.Stack {
       authorizer: jwtAuthorizer,
     });
 
-    const apiBaseUrl = `${httpApi.apiEndpoint}/api`;
-
-    // 5. Static SPA hosting: always store assets in a private S3 bucket
-    const siteBucket = new s3.Bucket(this, 'FrontendBucket', {
-      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-      encryption: s3.BucketEncryption.S3_MANAGED,
-      enforceSSL: true,
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-      autoDeleteObjects: true,
-    });
-
+    // 6. Deploy Frontend SPA + Runtime config.json
     const deploySources: s3deploy.ISource[] = [
       s3deploy.Source.asset(path.join(__dirname, '../../frontend/dist')),
       s3deploy.Source.jsonData('config.json', {
@@ -210,55 +305,21 @@ export class ActivityRacerStack extends cdk.Stack {
         region: this.region,
         userPoolId: userPool.userPoolId,
         userPoolClientId: userPoolClient.userPoolClientId,
+        cognitoDomain: cognitoDomainUrl,
+        googleAuthEnabled: enableGoogleAuth,
+        callbackPath,
+        logoutPath,
         hostingMode: enableCloudFront ? 'cloudfront' : 'apigw-lambda-s3',
       }),
     ];
 
-    let frontendUrl: string;
-
-    if (enableCloudFront) {
-      // Production-preferred path: CloudFront OAC in front of private S3 (no Lambda@Edge)
-      const s3Origin = origins.S3BucketOrigin.withOriginAccessControl(siteBucket);
-
-      const distribution = new cloudfront.Distribution(this, 'FrontendDistribution', {
-        comment: 'Activity Racer SPA distribution',
-        defaultRootObject: 'index.html',
-        defaultBehavior: {
-          origin: s3Origin,
-          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-          cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
-        },
-        additionalBehaviors: {
-          '/config.json': {
-            origin: s3Origin,
-            viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-            cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
-          },
-        },
-        errorResponses: [
-          {
-            httpStatus: 403,
-            responseHttpStatus: 200,
-            responsePagePath: '/index.html',
-            ttl: cdk.Duration.seconds(0),
-          },
-          {
-            httpStatus: 404,
-            responseHttpStatus: 200,
-            responsePagePath: '/index.html',
-            ttl: cdk.Duration.seconds(0),
-          },
-        ],
-      });
-
+    if (distribution) {
       new s3deploy.BucketDeployment(this, 'DeployFrontend', {
         sources: deploySources,
         destinationBucket: siteBucket,
         distribution,
         distributionPaths: ['/index.html', '/config.json'],
       });
-
-      frontendUrl = `https://${distribution.distributionDomainName}`;
     } else {
       // Temporary Option B3 stand-in while CloudFront verification is pending:
       // Serve private S3 SPA assets over HTTPS through HTTP API Gateway + ARM64 Lambda.
@@ -286,8 +347,6 @@ export class ActivityRacerStack extends cdk.Stack {
         sources: deploySources,
         destinationBucket: siteBucket,
       });
-
-      frontendUrl = httpApi.apiEndpoint;
     }
 
     // Stack outputs
@@ -316,6 +375,26 @@ export class ActivityRacerStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'UserPoolClientId', {
       value: userPoolClient.userPoolClientId,
       description: 'Cognito Public SPA User Pool Client ID',
+    });
+
+    new cdk.CfnOutput(this, 'CognitoDomain', {
+      value: cognitoDomainUrl,
+      description: 'Cognito Managed Login domain base URL',
+    });
+
+    new cdk.CfnOutput(this, 'GoogleJavaScriptOrigin', {
+      value: cognitoDomainUrl,
+      description: 'Authorized JavaScript origin to configure in Google Cloud Console',
+    });
+
+    new cdk.CfnOutput(this, 'GoogleRedirectUri', {
+      value: `${cognitoDomainUrl}/oauth2/idpresponse`,
+      description: 'Authorized redirect URI to configure in Google Cloud Console',
+    });
+
+    new cdk.CfnOutput(this, 'GoogleAuthEnabled', {
+      value: enableGoogleAuth ? 'true' : 'false',
+      description: 'Whether the Google IdP is attached to the Cognito SPA client',
     });
   }
 }

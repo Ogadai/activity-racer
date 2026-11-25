@@ -20,16 +20,16 @@ import { HttpError, handleError, jsonResponse, parseJsonBody } from '../lib/http
 async function handleGetMe(
   event: APIGatewayProxyEventV2WithJWTAuthorizer,
 ): Promise<APIGatewayProxyResultV2> {
-  const { userId, email } = getAuthClaims(event);
-  const profileItem = await ensurePlayerProfile(userId, email);
+  const { userId, email, name } = getAuthClaims(event);
+  const profileItem = await ensurePlayerProfile(userId, email, name);
   return jsonResponse(200, toPlayerProfile(profileItem));
 }
 
 async function handlePutMe(
   event: APIGatewayProxyEventV2WithJWTAuthorizer,
 ): Promise<APIGatewayProxyResultV2> {
-  const { userId, email } = getAuthClaims(event);
-  const current = await ensurePlayerProfile(userId, email);
+  const { userId, email, name } = getAuthClaims(event);
+  const current = await ensurePlayerProfile(userId, email, name);
   const body = parseJsonBody<UpdatePlayerProfileRequest>(event);
 
   let displayName = current.displayName;

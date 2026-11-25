@@ -10,11 +10,17 @@ export async function loadRuntimeConfig(): Promise<RuntimeConfig> {
   // Local dev override via Vite env vars
   const envApiUrl = import.meta.env.VITE_API_URL as string | undefined;
   if (envApiUrl) {
+    const envCognitoDomain = import.meta.env.VITE_COGNITO_DOMAIN as string | undefined;
+    const envGoogleEnabled = import.meta.env.VITE_GOOGLE_AUTH_ENABLED as string | undefined;
     cachedConfig = {
       apiUrl: envApiUrl.replace(/\/+$/, ''),
       region: (import.meta.env.VITE_AWS_REGION as string | undefined) ?? 'eu-north-1',
       userPoolId: import.meta.env.VITE_USER_POOL_ID as string | undefined,
       userPoolClientId: import.meta.env.VITE_USER_POOL_CLIENT_ID as string | undefined,
+      cognitoDomain: envCognitoDomain?.replace(/\/+$/, ''),
+      googleAuthEnabled: envGoogleEnabled === 'true',
+      callbackPath: '/auth/callback',
+      logoutPath: '/login',
     };
     return cachedConfig;
   }
@@ -29,6 +35,9 @@ export async function loadRuntimeConfig(): Promise<RuntimeConfig> {
   cachedConfig = {
     ...data,
     apiUrl: data.apiUrl.replace(/\/+$/, ''),
+    cognitoDomain: data.cognitoDomain?.replace(/\/+$/, ''),
+    callbackPath: data.callbackPath ?? '/auth/callback',
+    logoutPath: data.logoutPath ?? '/login',
   };
   return cachedConfig;
 }

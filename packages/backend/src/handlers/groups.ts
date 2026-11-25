@@ -76,8 +76,8 @@ async function handleListGroups(
 async function handleCreateGroup(
   event: APIGatewayProxyEventV2WithJWTAuthorizer,
 ): Promise<APIGatewayProxyResultV2> {
-  const { userId, email } = getAuthClaims(event);
-  await ensurePlayerProfile(userId, email);
+  const { userId, email, name: userName } = getAuthClaims(event);
+  await ensurePlayerProfile(userId, email, userName);
 
   const body = parseJsonBody<CreateGroupRequest>(event);
   if (typeof body.name !== 'string') {
@@ -178,8 +178,8 @@ async function handleCreateGroup(
 async function handleJoinGroup(
   event: APIGatewayProxyEventV2WithJWTAuthorizer,
 ): Promise<APIGatewayProxyResultV2> {
-  const { userId, email } = getAuthClaims(event);
-  await ensurePlayerProfile(userId, email);
+  const { userId, email, name } = getAuthClaims(event);
+  await ensurePlayerProfile(userId, email, name);
 
   const body = parseJsonBody<JoinGroupRequest>(event);
   if (typeof body.inviteCode !== 'string') {

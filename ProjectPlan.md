@@ -116,10 +116,12 @@ activity-racer/
   - `GET /api/groups/{groupId}/race?range=daily|weekly&date=YYYY-MM-DD`
 - [x] Deploy and verify endpoints (including simulated Home Assistant `POST /api/stats`)
 
-### Phase 3: Frontend Auth, Routing & Group Management
-- [ ] Integrate Cognito sign-up, email confirmation, sign-in, sign-out, and protected routes
-- [ ] Wire `@tanstack/react-query` API client with Cognito Bearer JWT headers & polling
-- [ ] Build React Router pages: `/login`, `/groups`, `/settings` (with copyable Home Assistant YAML), and `/race` (wired table placeholder)
+### Phase 3: Frontend Auth (Google OAuth2), Routing & Group Management
+- [x] Provision Cognito Managed Login v2 domain + OAuth 2.0 Authorization Code + PKCE SPA client (`-c enableGoogleAuth=true` flag ready for Google IdP wiring; email/password self-sign-up disabled)
+- [x] Integrate native Web Crypto PKCE (`S256`) + `state`/`nonce` auth flow, silent token refresh, `/oauth2/revoke` + `/logout` sign-out, and protected routes
+- [x] Wire `@tanstack/react-query` API client with Cognito Bearer JWT headers, 401 refresh-retry, and 30s live race polling
+- [x] Build React Router pages: `/login` ("Continue with Google"), `/auth/callback`, `/groups`, `/settings` (handicapping + copyable Home Assistant YAML), and `/race` (wired leaderboard table placeholder)
+- [x] Wire Google Cloud OAuth 2.0 Client ID & Secret into Cognito User Pool and re-deploy with `enableGoogleAuth=true`
 
 ### Phase 4: Gamified Race UI
 - [ ] Build visual Race Track component (bikes on track positioned by weighted %, 100% finish line, overdrive >100% badge)
