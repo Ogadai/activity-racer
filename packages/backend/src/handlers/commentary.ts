@@ -14,12 +14,15 @@ import { ddb, getTableName, keys, type RaceCommentaryItem } from '../lib/db';
 import { HttpError, handleError, jsonResponse } from '../lib/http';
 import { loadGroupRaceData } from '../lib/raceLoader';
 
-const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
+const DEFAULT_GEMINI_MODEL = 'gemini-3.1-flash-lite';
+const COMMENTARY_PROMPT_VERSION = 2;
 const DEFAULT_COOLDOWN_MS = 5 * 60 * 1000; // 5-minute regeneration cooldown for Free Tier protection
+const MODEL_CACHE_TTL_MS = 60 * 1000; // Re-check SSM model param every 60s so changes take effect without redeploy
 const GEMINI_TIMEOUT_MS = 18_000;
 
 const ssm = new SSMClient({});
 let cachedGeminiApiKey: string | null = null;
+let cachedGeminiModel: { value: string; expiresAt: number } | null = null;
 
 const WEEKDAY_LONG = [
   'Sunday',
@@ -39,6 +42,38 @@ function getDayLabel(isoDate: string): string {
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+/**
+ * Maps each rider to their first name (e.g. "Andy Lee" -> "Andy").
+ * Only appends a last initial ("Alex S.") if two riders in the same group share a first name.
+ */
+function buildShortNameMap(
+  standings: readonly { userId: string; displayName: string }[],
+): Map<string, string> {
+  const partsByUser = standings.map((s) => {
+    const parts = s.displayName.trim().split(/\s+/).filter(Boolean);
+    const first = parts[0] || 'Racer';
+    const last = parts.length > 1 ? parts[parts.length - 1] : '';
+    return { userId: s.userId, first, last };
+  });
+
+  const firstCounts = new Map<string, number>();
+  for (const p of partsByUser) {
+    const key = p.first.toLowerCase();
+    firstCounts.set(key, (firstCounts.get(key) ?? 0) + 1);
+  }
+
+  const result = new Map<string, string>();
+  for (const p of partsByUser) {
+    const hasCollision = (firstCounts.get(p.first.toLowerCase()) ?? 0) > 1;
+    if (hasCollision && p.last) {
+      result.set(p.userId, `${p.first} ${p.last.charAt(0).toUpperCase()}.`);
+    } else {
+      result.set(p.userId, p.first);
+    }
+  }
+  return result;
 }
 
 interface DayRiderProgress {
@@ -106,6 +141,7 @@ function buildRaceProgressionSnapshot(
   }
 
   const activeDates = rawDates.slice(0, activeCount);
+  const shortNames = buildShortNameMap(race.standings);
   const cumulativeByUser = new Map<string, number>();
   const prevRankByUser = new Map<string, number>();
   let hasAnyActivity = false;
@@ -127,7 +163,7 @@ function buildRaceProgressionSnapshot(
 
       return {
         userId: standing.userId,
-        name: standing.displayName,
+        name: shortNames.get(standing.userId) ?? standing.displayName,
         dayLaps,
         cumulativeLaps: nextCum,
         inOverdrive: dayLaps > 1,
@@ -198,7 +234,7 @@ function buildRaceProgressionSnapshot(
 
 function computeSnapshotHash(snapshot: RaceProgressionSnapshot): string {
   const canonical = JSON.stringify({
-    v: 1,
+    v: COMMENTARY_PROMPT_VERSION,
     range: snapshot.range,
     startDate: snapshot.startDate,
     endDate: snapshot.endDate,
@@ -253,6 +289,38 @@ async function getGeminiApiKey(): Promise<string> {
   }
 }
 
+async function getGeminiModel(): Promise<string> {
+  const fallback = process.env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL;
+  const paramName = process.env.GEMINI_MODEL_PARAM?.trim();
+  if (!paramName) {
+    return fallback;
+  }
+
+  const now = Date.now();
+  if (cachedGeminiModel && cachedGeminiModel.expiresAt > now) {
+    return cachedGeminiModel.value;
+  }
+
+  try {
+    const res = await ssm.send(
+      new GetParameterCommand({
+        Name: paramName,
+        WithDecryption: false,
+      }),
+    );
+    const value = res.Parameter?.Value?.trim() || fallback;
+    cachedGeminiModel = { value, expiresAt: now + MODEL_CACHE_TTL_MS };
+    return value;
+  } catch (err: unknown) {
+    const name = (err as { name?: string })?.name;
+    if (name !== 'ParameterNotFound') {
+      console.warn(`Failed to read Gemini model param '${paramName}' from SSM, using fallback '${fallback}':`, err);
+    }
+    cachedGeminiModel = { value: fallback, expiresAt: now + MODEL_CACHE_TTL_MS };
+    return fallback;
+  }
+}
+
 interface GeminiCommentaryPayload {
   headline: string;
   days: RaceCommentaryDay[];
@@ -266,9 +334,10 @@ async function generateGeminiCommentary(
 ): Promise<GeminiCommentaryPayload> {
   const systemInstruction = [
     'You are an energetic, concise velodrome track-cycling broadcast announcer calling an indoor wooden-track race.',
-    'Write day-by-day race commentary designed to display in 1–2 lines on a smartphone screen as each day animates.',
+    'Write day-by-day race commentary designed to fit in 1–2 lines on a smartphone screen as each day animates.',
     'Rules:',
-    '- Exactly 1 sentence or 2 very short punchy sentences per day (aim for 14–26 words per day; never exceed 30 words).',
+    '- Exactly 1 short punchy sentence (or 2 very brief sentences) per day — strictly 10–20 words per day max so it stays 1–2 lines on mobile.',
+    '- Refer to riders ONLY by the short first names provided in the data (never invent or add last names).',
     '- Capture the excitement of the race: breakaways, overtakes, drafting, wheel-to-wheel battles, hitting Overdrive (when inOverdrive is true), holding the lead, or cruising on a recovery day.',
     '- STRICTLY FORBIDDEN: Never mention steps, calories, kcal, walking, workouts, fitness trackers, sensors, Home Assistant, percentages, or points. Talk strictly in cycling/velodrome racing terms (laps, pace, surges, lead, overdrive, finish line).',
     '- If a day has isFinalDay=true (such as Sunday in a weekly race, or a daily race), explicitly announce and celebrate the winner (or co-winners if tied in finalWinners)!',
@@ -331,11 +400,20 @@ async function generateGeminiCommentary(
 
     if (!response.ok) {
       const errBody = await response.text().catch(() => '');
-      console.error(`Gemini API returned HTTP ${response.status}:`, errBody.slice(0, 500));
+      console.error(`Gemini API (${model}) returned HTTP ${response.status}:`, errBody.slice(0, 500));
       if (response.status === 429) {
         throw new HttpError(429, 'AI announcer is temporarily rate-limited. Please try again shortly.');
       }
-      throw new HttpError(502, 'AI commentary provider returned an unexpected error.');
+      if (response.status === 404) {
+        throw new HttpError(
+          502,
+          `Gemini model '${model}' was not found (HTTP 404). Update /activity-racer/gemini-model in SSM Parameter Store.`,
+        );
+      }
+      throw new HttpError(
+        502,
+        `AI commentary provider returned HTTP ${response.status} for model '${model}'.`,
+      );
     }
 
     const data = (await response.json()) as {
@@ -468,7 +546,8 @@ export const handler = async (
     }
 
     // 4. Enforce 5-minute regeneration cooldown if stats are actively trickling in
-    if (existing) {
+    // (Allow immediate upgrade if cached entry came from an older promptVersion)
+    if (existing && existing.promptVersion === COMMENTARY_PROMPT_VERSION) {
       const generatedMs = Date.parse(existing.generatedAt);
       const hasAllActiveDays = existing.days.length >= snapshot.days.length;
       if (
@@ -480,9 +559,8 @@ export const handler = async (
       }
     }
 
-    // 5. Fetch decrypted Gemini API key from SSM Parameter Store (cached across warm invocations)
-    const apiKey = await getGeminiApiKey();
-    const model = process.env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL;
+    // 5. Fetch decrypted Gemini API key and model name from SSM Parameter Store
+    const [apiKey, model] = await Promise.all([getGeminiApiKey(), getGeminiModel()]);
 
     // 6. Generate fresh commentary and overwrite cache item in DynamoDB
     const generated = await generateGeminiCommentary(apiKey, model, snapshot);
@@ -497,6 +575,7 @@ export const handler = async (
       startDate: race.startDate,
       endDate: race.endDate,
       dataHash,
+      promptVersion: COMMENTARY_PROMPT_VERSION,
       headline: generated.headline,
       days: generated.days,
       summary: generated.summary,

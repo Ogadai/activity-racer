@@ -279,6 +279,7 @@ export function RacePage() {
   );
   const [ttsEnabled, setTtsEnabled] = useState<boolean>(initialPrefs.ttsEnabled);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [waitingForCommentary, setWaitingForCommentary] = useState<boolean>(false);
   const [uiTimelineT, setUiTimelineT] = useState<number>(0);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
 
@@ -349,9 +350,17 @@ export function RacePage() {
         timelineTRef.current = timeline.activeSegmentCount;
         setUiTimelineT(timeline.activeSegmentCount);
         setIsPlaying(false);
+        setWaitingForCommentary(false);
+      } else if (commentaryEnabled && commentaryQuery.isPending) {
+        // Hold riders at the starting line until AI commentary resolves (or settles with error)
+        timelineTRef.current = 0;
+        setUiTimelineT(0);
+        setIsPlaying(false);
+        setWaitingForCommentary(true);
       } else {
         timelineTRef.current = 0;
         setUiTimelineT(0);
+        setWaitingForCommentary(false);
         setIsPlaying(true);
       }
       return;
@@ -362,7 +371,19 @@ export function RacePage() {
       timelineTRef.current = timeline.activeSegmentCount;
       setUiTimelineT(timeline.activeSegmentCount);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeline, raceIdentity, raceSignature]);
+
+  // Start auto-play as soon as commentary finishes loading (or if user hides commentary)
+  useEffect(() => {
+    if (!waitingForCommentary || !timeline) {
+      return;
+    }
+    if (!commentaryEnabled || !commentaryQuery.isPending) {
+      setWaitingForCommentary(false);
+      setIsPlaying(true);
+    }
+  }, [waitingForCommentary, commentaryEnabled, commentaryQuery.isPending, timeline]);
 
   // Drive playback clock smoothly; throttle React HUD/scrubber updates to ~20 Hz
   useEffect(() => {
@@ -432,6 +453,7 @@ export function RacePage() {
 
   const handleTogglePlay = useCallback(() => {
     if (!timeline) return;
+    setWaitingForCommentary(false);
     setIsPlaying((prev) => {
       if (prev) {
         return false;
@@ -446,6 +468,7 @@ export function RacePage() {
 
   const handleReplay = useCallback(() => {
     if (!timeline) return;
+    setWaitingForCommentary(false);
     timelineTRef.current = 0;
     setUiTimelineT(0);
     setIsPlaying(true);
@@ -453,6 +476,7 @@ export function RacePage() {
 
   const handleSkipToFinish = useCallback(() => {
     if (!timeline) return;
+    setWaitingForCommentary(false);
     timelineTRef.current = timeline.activeSegmentCount;
     setUiTimelineT(timeline.activeSegmentCount);
     setIsPlaying(false);
@@ -461,6 +485,7 @@ export function RacePage() {
   const handleScrub = useCallback(
     (nextT: number) => {
       if (!timeline) return;
+      setWaitingForCommentary(false);
       const clamped = Math.max(0, Math.min(timeline.activeSegmentCount, nextT));
       timelineTRef.current = clamped;
       setUiTimelineT(clamped);
@@ -640,7 +665,6 @@ export function RacePage() {
                   ttsEnabled={ttsEnabled}
                   isPlaying={isPlaying}
                   activeDayDate={uiFrame.activeDay.date}
-                  activeDayShortLabel={uiFrame.activeDay.shortLabel}
                   isFinalDay={
                     raceData.range === 'daily' ||
                     uiFrame.activeDayIndex === timeline.days.length - 1
@@ -656,6 +680,7 @@ export function RacePage() {
                   timeline={timeline}
                   frame={uiFrame}
                   isPlaying={isPlaying}
+                  waitingForCommentary={waitingForCommentary}
                   speed={speed}
                   onTogglePlay={handleTogglePlay}
                   onReplay={handleReplay}

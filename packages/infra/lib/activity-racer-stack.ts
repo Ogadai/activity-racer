@@ -24,6 +24,7 @@ export class ActivityRacerStack extends cdk.Stack {
     const enableGoogleAuth = this.node.tryGetContext('enableGoogleAuth') === 'true';
     const enableAiCommentary = this.node.tryGetContext('enableAiCommentary') !== 'false';
     const geminiApiKeyParamName = '/activity-racer/gemini-api-key';
+    const geminiModelParamName = '/activity-racer/gemini-model';
     const explicitDomainPrefix = this.node.tryGetContext('cognitoDomainPrefix') as
       | string
       | undefined;
@@ -254,7 +255,8 @@ export class ActivityRacerStack extends cdk.Stack {
           {
             TABLE_NAME: table.tableName,
             GEMINI_API_KEY_PARAM: geminiApiKeyParamName,
-            GEMINI_MODEL: 'gemini-2.5-flash',
+            GEMINI_MODEL_PARAM: geminiModelParamName,
+            GEMINI_MODEL: 'gemini-3.1-flash-lite',
           },
           cdk.Duration.seconds(25),
         )
@@ -262,12 +264,13 @@ export class ActivityRacerStack extends cdk.Stack {
 
     if (commentaryFn) {
       table.grantReadWriteData(commentaryFn);
-      // Least-privilege access to the single Standard-tier SSM SecureString parameter ($0 Always Free)
+      // Least-privilege access to Standard-tier SSM parameters ($0 Always Free)
       commentaryFn.addToRolePolicy(
         new iam.PolicyStatement({
           actions: ['ssm:GetParameter'],
           resources: [
             `arn:${cdk.Aws.PARTITION}:ssm:${this.region}:${cdk.Aws.ACCOUNT_ID}:parameter${geminiApiKeyParamName}`,
+            `arn:${cdk.Aws.PARTITION}:ssm:${this.region}:${cdk.Aws.ACCOUNT_ID}:parameter${geminiModelParamName}`,
           ],
         }),
       );
@@ -441,6 +444,10 @@ export class ActivityRacerStack extends cdk.Stack {
       new cdk.CfnOutput(this, 'GeminiApiKeyParamPath', {
         value: geminiApiKeyParamName,
         description: 'SSM Parameter Store (SecureString, Standard tier) path for the Gemini API key',
+      });
+      new cdk.CfnOutput(this, 'GeminiModelParamPath', {
+        value: geminiModelParamName,
+        description: 'SSM Parameter Store (String, Standard tier) path for the Gemini model ID',
       });
     }
   }

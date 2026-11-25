@@ -8,6 +8,7 @@ interface PlaybackControlsProps {
   timeline: RaceTimeline;
   frame: RaceTimelineFrame;
   isPlaying: boolean;
+  waitingForCommentary?: boolean;
   speed: PlaybackSpeed;
   onTogglePlay: () => void;
   onReplay: () => void;
@@ -20,6 +21,7 @@ export function PlaybackControls({
   timeline,
   frame,
   isPlaying,
+  waitingForCommentary = false,
   speed,
   onTogglePlay,
   onReplay,
@@ -41,7 +43,7 @@ export function PlaybackControls({
             {frame.activeDay?.fullLabel ?? (timeline.range === 'weekly' ? 'Weekly' : 'Daily')}
           </span>
           <span className="hud-state-tag">
-            {isPlaying ? 'Live' : isAtFinish ? 'Finish' : 'Paused'}
+            {isPlaying ? 'Live' : waitingForCommentary ? 'Waiting' : isAtFinish ? 'Finish' : 'Paused'}
           </span>
         </div>
 
