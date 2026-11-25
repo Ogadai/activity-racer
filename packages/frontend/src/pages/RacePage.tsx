@@ -1,7 +1,17 @@
-import { useEffect, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { getTodayIsoDate, type RaceRange } from '@activity-racer/shared';
 import { useGroups, useRace } from '../api/queries';
+import { PlaybackControls, type PlaybackSpeed } from '../components/PlaybackControls';
+import type { CameraMode } from '../components/VelodromeRace3D';
+import {
+  buildRaceTimeline,
+  computeRaceDataSignature,
+  computeRaceIdentity,
+  sampleRaceTimeline,
+} from '../race/trackMath';
+
+const VelodromeRace3D = lazy(() => import('../components/VelodromeRace3D'));
 
 function formatTime(timestamp: number | string | null): string {
   if (!timestamp) {
@@ -14,10 +24,32 @@ function formatTime(timestamp: number | string | null): string {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
+function prefersReducedMotion(): boolean {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return false;
+  }
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
 export function RacePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [range, setRange] = useState<RaceRange>('daily');
   const [date, setDate] = useState<string>(() => getTodayIsoDate());
+  const [cameraMode, setCameraMode] = useState<CameraMode>('stadium');
+  const [showLabels, setShowLabels] = useState<boolean>(true);
+  const [speed, setSpeed] = useState<PlaybackSpeed>(1);
+  const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [uiTimelineT, setUiTimelineT] = useState<number>(0);
+
+  // Refs shared with the 60fps Three.js render loop to avoid per-frame React re-renders
+  const timelineTRef = useRef<number>(0);
+  const isPlayingRef = useRef<boolean>(false);
+  const speedRef = useRef<PlaybackSpeed>(1);
+  const lastRaceIdentityRef = useRef<string | null>(null);
+  const lastDataSignatureRef = useRef<string | null>(null);
+
+  isPlayingRef.current = isPlaying;
+  speedRef.current = speed;
 
   const groupsQuery = useGroups();
   const groups = groupsQuery.data?.groups ?? [];
@@ -33,21 +65,174 @@ export function RacePage() {
   }, [activeGroupId, paramGroupId, setSearchParams]);
 
   const raceQuery = useRace(activeGroupId, range, date);
+  const raceData = raceQuery.data;
+
+  // Build stable timeline only when actual race scores/structure change (polling-safe)
+  const raceIdentity = raceData ? computeRaceIdentity(raceData) : null;
+  const raceSignature = raceData ? computeRaceDataSignature(raceData) : null;
+
+  const timeline = useMemo(() => {
+    if (!raceData) {
+      return null;
+    }
+    return buildRaceTimeline(raceData);
+    // Recompute only when raceSignature changes so identical 30s polls preserve object identity
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [raceSignature]);
+
+  // Reset playback ONLY when switching group/range/date window; preserve cursor on identical polls
+  useEffect(() => {
+    if (!timeline || !raceIdentity || !raceSignature) {
+      return;
+    }
+
+    const identityChanged = lastRaceIdentityRef.current !== raceIdentity;
+    lastRaceIdentityRef.current = raceIdentity;
+    lastDataSignatureRef.current = raceSignature;
+
+    if (identityChanged) {
+      if (prefersReducedMotion()) {
+        timelineTRef.current = timeline.activeSegmentCount;
+        setUiTimelineT(timeline.activeSegmentCount);
+        setIsPlaying(false);
+      } else {
+        timelineTRef.current = 0;
+        setUiTimelineT(0);
+        setIsPlaying(true);
+      }
+      return;
+    }
+
+    // Same race view: clamp cursor smoothly if active segment count changed
+    if (timelineTRef.current > timeline.activeSegmentCount) {
+      timelineTRef.current = timeline.activeSegmentCount;
+      setUiTimelineT(timeline.activeSegmentCount);
+    }
+  }, [timeline, raceIdentity, raceSignature]);
+
+  // Drive playback clock smoothly; throttle React HUD/scrubber updates to ~20 Hz
+  useEffect(() => {
+    if (!timeline || !isPlaying) {
+      return;
+    }
+
+    let rafId: number | null = null;
+    let lastMs = performance.now();
+    let lastUiSyncMs = lastMs;
+    const maxT = timeline.activeSegmentCount;
+    const secPerSeg = timeline.secondsPerSegment;
+
+    const tick = (nowMs: number) => {
+      rafId = null;
+      if (document.visibilityState === 'hidden') {
+        return;
+      }
+
+      const dtSec = Math.min(0.1, Math.max(0, (nowMs - lastMs) / 1000));
+      lastMs = nowMs;
+
+      const deltaT = (dtSec * speedRef.current) / secPerSeg;
+      const nextT = Math.min(maxT, timelineTRef.current + deltaT);
+      timelineTRef.current = nextT;
+
+      if (nextT >= maxT) {
+        setUiTimelineT(maxT);
+        setIsPlaying(false);
+        return;
+      }
+
+      if (nowMs - lastUiSyncMs >= 50) {
+        lastUiSyncMs = nowMs;
+        setUiTimelineT(nextT);
+      }
+
+      rafId = window.requestAnimationFrame(tick);
+    };
+
+    const resumeIfVisible = () => {
+      if (document.visibilityState === 'hidden') {
+        if (rafId !== null) {
+          window.cancelAnimationFrame(rafId);
+          rafId = null;
+        }
+      } else if (rafId === null) {
+        lastMs = performance.now();
+        rafId = window.requestAnimationFrame(tick);
+      }
+    };
+
+    document.addEventListener('visibilitychange', resumeIfVisible);
+    rafId = window.requestAnimationFrame(tick);
+
+    return () => {
+      document.removeEventListener('visibilitychange', resumeIfVisible);
+      if (rafId !== null) {
+        window.cancelAnimationFrame(rafId);
+      }
+    };
+  }, [timeline, isPlaying]);
 
   const handleGroupChange = (nextGroupId: string) => {
     setSearchParams({ group: nextGroupId });
   };
 
+  const handleTogglePlay = useCallback(() => {
+    if (!timeline) return;
+    setIsPlaying((prev) => {
+      if (prev) {
+        return false;
+      }
+      if (timelineTRef.current >= timeline.activeSegmentCount - 0.001) {
+        timelineTRef.current = 0;
+        setUiTimelineT(0);
+      }
+      return true;
+    });
+  }, [timeline]);
+
+  const handleReplay = useCallback(() => {
+    if (!timeline) return;
+    timelineTRef.current = 0;
+    setUiTimelineT(0);
+    setIsPlaying(true);
+  }, [timeline]);
+
+  const handleSkipToFinish = useCallback(() => {
+    if (!timeline) return;
+    timelineTRef.current = timeline.activeSegmentCount;
+    setUiTimelineT(timeline.activeSegmentCount);
+    setIsPlaying(false);
+  }, [timeline]);
+
+  const handleScrub = useCallback(
+    (nextT: number) => {
+      if (!timeline) return;
+      const clamped = Math.max(0, Math.min(timeline.activeSegmentCount, nextT));
+      timelineTRef.current = clamped;
+      setUiTimelineT(clamped);
+    },
+    [timeline],
+  );
+
+  const uiFrame = useMemo(() => {
+    if (!timeline) {
+      return null;
+    }
+    return sampleRaceTimeline(timeline, uiTimelineT);
+  }, [timeline, uiTimelineT]);
+
+  const hasCurrentUser = Boolean(raceData?.standings.some((s) => s.isCurrentUser));
+
   return (
     <div className="page-stack">
       <div className="page-header">
         <div>
-          <h1>Live Race Leaderboard</h1>
+          <h1>Live Velodrome Race</h1>
           <p className="subtitle">
-            Phase 3 wired table view · Visual bike race track arrives in Phase 4.
+            3D animated velodrome replay synced to daily &amp; weekly weighted activity scores.
           </p>
         </div>
-        {raceQuery.data && (
+        {raceData && (
           <div className="refresh-meta">
             <span className="muted small">
               Auto-polling every 30s · Updated {formatTime(raceQuery.dataUpdatedAt)}
@@ -151,30 +336,79 @@ export function RacePage() {
             </div>
           </section>
 
-          <section className="card">
-            {raceQuery.isPending && <p className="muted">Loading standings...</p>}
+          {raceQuery.isPending && (
+            <section className="card">
+              <p className="muted">Loading race track &amp; standings...</p>
+            </section>
+          )}
 
-            {raceQuery.isError && (
+          {raceQuery.isError && (
+            <section className="card">
               <div className="alert alert-error">
                 {raceQuery.error instanceof Error
                   ? raceQuery.error.message
                   : 'Failed to load race standings.'}
               </div>
-            )}
+            </section>
+          )}
 
-            {raceQuery.data && (
-              <>
+          {raceData && timeline && uiFrame && (
+            <>
+              <section className="card velodrome-card">
                 <div className="section-head">
                   <div>
-                    <h2>{raceQuery.data.group.name}</h2>
+                    <h2>{raceData.group.name}</h2>
                     <p className="muted small">
-                      {raceQuery.data.range === 'weekly'
-                        ? `Week of ${raceQuery.data.startDate} to ${raceQuery.data.endDate}`
-                        : `Daily race for ${raceQuery.data.date}`}
+                      {raceData.range === 'weekly'
+                        ? `Week of ${raceData.startDate} to ${raceData.endDate}`
+                        : `Daily race for ${raceData.date}`}
                       {' · Invite code: '}
-                      <code className="code-inline">{raceQuery.data.group.inviteCode}</code>
+                      <code className="code-inline">{raceData.group.inviteCode}</code>
                     </p>
                   </div>
+                </div>
+
+                <Suspense
+                  fallback={
+                    <div className="velodrome-loading">
+                      <div className="spinner" aria-hidden="true" />
+                      <p className="muted small">Loading 3D Velodrome...</p>
+                    </div>
+                  }
+                >
+                  <VelodromeRace3D
+                    timeline={timeline}
+                    timelineTRef={timelineTRef}
+                    isPlayingRef={isPlayingRef}
+                    speedRef={speedRef}
+                    cameraMode={cameraMode}
+                    showLabels={showLabels}
+                    hasCurrentUser={hasCurrentUser}
+                    onCameraModeChange={setCameraMode}
+                    onToggleLabels={() => setShowLabels((v) => !v)}
+                  />
+                </Suspense>
+
+                <PlaybackControls
+                  timeline={timeline}
+                  frame={uiFrame}
+                  isPlaying={isPlaying}
+                  speed={speed}
+                  onTogglePlay={handleTogglePlay}
+                  onReplay={handleReplay}
+                  onSkipToFinish={handleSkipToFinish}
+                  onSpeedChange={setSpeed}
+                  onScrub={handleScrub}
+                />
+              </section>
+
+              <section className="card">
+                <div className="section-head">
+                  <h3>Standings</h3>
+                  <span className="muted small">
+                    {raceData.standings.length}{' '}
+                    {raceData.standings.length === 1 ? 'racer' : 'racers'}
+                  </span>
                 </div>
 
                 <div className="table-wrap">
@@ -190,7 +424,7 @@ export function RacePage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {raceQuery.data.standings.map((row) => (
+                      {raceData.standings.map((row) => (
                         <tr
                           key={row.userId}
                           className={row.isCurrentUser ? 'row-current-user' : undefined}
@@ -256,9 +490,9 @@ export function RacePage() {
                     </tbody>
                   </table>
                 </div>
-              </>
-            )}
-          </section>
+              </section>
+            </>
+          )}
         </>
       )}
     </div>
