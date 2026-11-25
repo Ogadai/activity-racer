@@ -79,25 +79,27 @@ a {
 .navbar-inner {
   max-width: 1040px;
   margin: 0 auto;
-  padding: 0.75rem 1.25rem;
+  padding: 0.55rem 1.25rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
+  gap: 0.75rem;
+  flex-wrap: nowrap;
 }
 
 .navbar-left {
   display: flex;
   align-items: center;
-  gap: 1.5rem;
-  flex-wrap: wrap;
+  gap: 1.1rem;
+  min-width: 0;
+  flex-wrap: nowrap;
 }
 
 .navbar-right {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.6rem;
+  flex-shrink: 0;
 }
 
 .brand {
@@ -105,14 +107,27 @@ a {
   align-items: center;
   gap: 0.5rem;
   font-weight: 700;
-  font-size: 1.05rem;
+  font-size: 1rem;
   color: var(--color-text-primary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.brand-badge {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  flex-shrink: 0;
 }
 
 .brand-dot,
 .color-dot {
-  width: 11px;
-  height: 11px;
+  width: 10px;
+  height: 10px;
   border-radius: 999px;
   display: inline-block;
   flex-shrink: 0;
@@ -120,16 +135,38 @@ a {
 
 .nav-links {
   display: flex;
-  gap: 0.35rem;
+  align-items: center;
+  gap: 0.25rem;
+  flex-wrap: nowrap;
 }
 
 .nav-link {
-  padding: 0.4rem 0.8rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.38rem 0.72rem;
   border-radius: 8px;
-  font-size: 0.92rem;
+  font-size: 0.9rem;
   font-weight: 500;
   color: var(--color-text-secondary);
+  white-space: nowrap;
   transition: background 0.15s ease, color 0.15s ease;
+}
+
+.nav-signout-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.ui-icon {
+  display: inline-block;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+.icon-spin {
+  animation: spin 0.8s linear infinite;
 }
 
 .nav-link:hover {
@@ -818,13 +855,38 @@ a {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.65rem;
-  flex-wrap: wrap;
+  gap: 0.5rem;
+  flex-wrap: nowrap;
+}
+
+.cam-segmented {
+  display: inline-flex;
+  min-width: 0;
 }
 
 .cam-btn {
-  padding: 0.36rem 0.68rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  padding: 0.36rem 0.64rem;
   font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.label-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding: 0.34rem 0.58rem;
+}
+
+.label-toggle-btn.active {
+  border-color: var(--color-primary-subtle-border);
+  background: var(--color-primary-subtle-bg);
+  color: var(--color-primary-subtle-text);
 }
 
 .velodrome-viewport {
@@ -1144,32 +1206,563 @@ a {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
-  flex-wrap: wrap;
+  gap: 0.5rem;
+  flex-wrap: nowrap;
 }
 
 .transport-buttons {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
-  flex-wrap: wrap;
+  gap: 0.35rem;
+  flex-wrap: nowrap;
+}
+
+.transport-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.32rem;
+  white-space: nowrap;
 }
 
 .speed-control {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.45rem;
+  flex-shrink: 0;
 }
 
 .speed-btn {
-  padding: 0.34rem 0.6rem;
+  padding: 0.34rem 0.55rem;
+  font-size: 0.78rem;
+}
+
+/* Milestone 4B — Compact Race Controls Strip */
+.race-page-stack {
+  gap: 0.9rem;
+}
+
+.race-controls-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  padding: 0.75rem 1rem;
+  flex-wrap: wrap;
+}
+
+.race-controls-primary,
+.race-controls-secondary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: nowrap;
+}
+
+.race-controls-primary {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.race-controls-secondary {
+  flex: 0 1 auto;
+}
+
+.race-group-select,
+.race-date-input {
+  padding: 0.44rem 0.65rem;
+  border: 1px solid var(--color-border-default);
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  background: var(--color-bg-input);
+  color: var(--color-text-primary);
+  min-width: 0;
+}
+
+.race-group-select {
+  flex: 1 1 auto;
+  max-width: 260px;
+  text-overflow: ellipsis;
+}
+
+.race-date-input {
+  width: 142px;
+  font-weight: 500;
+}
+
+.race-group-select:focus,
+.race-date-input:focus {
+  outline: 2px solid var(--color-focus-ring);
+  border-color: var(--color-primary);
+}
+
+.range-segmented {
+  flex-shrink: 0;
+}
+
+.range-segmented .seg-btn {
+  padding: 0.44rem 0.72rem;
+  font-size: 0.84rem;
+}
+
+.race-today-btn,
+.race-refresh-btn {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.refresh-btn-text {
+  font-variant-numeric: tabular-nums;
   font-size: 0.8rem;
 }
 
+/* Milestone 4B — Expandable Standings & Leader/You/Overdrive Highlighting */
+.standings-head {
+  margin-bottom: 0.6rem;
+}
+
+.standings-title-group {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.standings-title-group h2 {
+  margin: 0;
+}
+
+.standings-meta-right {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.race-row-clickable {
+  cursor: pointer;
+  transition: background 0.14s ease;
+}
+
+.race-row-clickable:hover {
+  background: var(--color-bg-hover);
+}
+
+.race-row-clickable:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+
+.race-row-clickable.row-current-user {
+  background: var(--color-row-highlight-bg);
+}
+
+.race-row-clickable.row-current-user td:first-child {
+  box-shadow: inset 3px 0 0 var(--color-primary);
+}
+
+.race-row-clickable.row-leader td:first-child {
+  box-shadow: inset 3px 0 0 var(--color-secondary);
+}
+
+.race-row-clickable.row-current-user.row-leader td:first-child {
+  box-shadow: inset 3px 0 0 var(--color-secondary), inset 6px 0 0 var(--color-primary);
+}
+
+.race-row-clickable.row-expanded td {
+  border-bottom-color: transparent;
+}
+
+.rank-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+
+.pill-leader-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22rem;
+  margin-left: 0;
+}
+
+.racer-identity {
+  min-width: 0;
+}
+
+.racer-display-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.col-chevron {
+  width: 28px;
+  text-align: right;
+  padding-left: 0.2rem !important;
+}
+
+.row-chevron {
+  color: var(--color-text-muted);
+  transition: transform 0.18s ease, color 0.18s ease;
+}
+
+.row-chevron.open {
+  transform: rotate(180deg);
+  color: var(--color-primary);
+}
+
+.mini-bar-fill.overdrive,
+.breakdown-bar-fill.overdrive,
+.weekly-bar-stick.overdrive {
+  background: linear-gradient(90deg, #9333ea, #3ea2dd);
+}
+
+.weekly-bar-stick.overdrive {
+  background: linear-gradient(180deg, #c084fc, #7e22ce);
+}
+
+/* Breakdown Drawer */
+.breakdown-row td {
+  padding: 0 0.75rem 0.95rem !important;
+  background: var(--color-bg-surface-subtle);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.breakdown-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.85rem 0.95rem;
+  border-radius: 10px;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-subtle);
+}
+
+.breakdown-formula-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  flex-wrap: wrap;
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+  padding-bottom: 0.55rem;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.breakdown-formula-text {
+  line-height: 1.4;
+}
+
+.breakdown-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.breakdown-metric-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  background: var(--color-bg-surface-subtle);
+  border: 1px solid var(--color-border-subtle);
+}
+
+.breakdown-metric-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.breakdown-metric-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.breakdown-metric-pct {
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.breakdown-metric-raw {
+  font-size: 0.84rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.breakdown-bar-track {
+  margin-top: 0.2rem;
+  width: 100%;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--color-progress-track);
+  overflow: hidden;
+}
+
+.breakdown-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.25s ease;
+}
+
+/* Weekly 7-Day Mini Bar Chart */
+.weekly-bars-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.weekly-bars-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.weekly-bars-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.weekly-bar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.22rem;
+  padding: 0.42rem 0.2rem;
+  border-radius: 8px;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-surface-subtle);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.weekly-bar-col:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+  border-color: var(--color-primary-subtle-border);
+}
+
+.weekly-bar-col.active {
+  border-color: var(--color-primary);
+  background: var(--color-primary-subtle-bg);
+}
+
+.weekly-bar-col.upcoming,
+.weekly-bar-col:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.weekly-bar-pct {
+  font-size: 0.7rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.weekly-bar-col.overdrive .weekly-bar-pct {
+  color: var(--color-overdrive-subtle-text);
+}
+
+.weekly-bar-well {
+  position: relative;
+  width: 18px;
+  height: 56px;
+  border-radius: 5px;
+  background: var(--color-progress-track);
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+}
+
+.weekly-bar-target-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 66.67%;
+  border-top: 1px dashed rgba(100, 116, 139, 0.7);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.weekly-bar-stick {
+  width: 100%;
+  min-height: 2px;
+  border-radius: 4px 4px 0 0;
+  transition: height 0.25s ease;
+}
+
+.weekly-bar-day {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+}
+
+.weekly-bar-raw {
+  font-size: 0.65rem;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Tablet & Compact Nav Breakpoint */
+@media (max-width: 760px) {
+  .brand-text,
+  .user-pill,
+  .nav-signout-label {
+    display: none;
+  }
+
+  .navbar-inner {
+    padding: 0.45rem 0.75rem;
+    gap: 0.5rem;
+  }
+
+  .navbar-left {
+    gap: 0.55rem;
+  }
+
+  .nav-link {
+    padding: 0.36rem 0.55rem;
+    font-size: 0.84rem;
+    gap: 0.28rem;
+  }
+
+  .nav-signout-btn {
+    padding: 0.38rem 0.5rem;
+  }
+}
+
+/* Mobile-First Polish (<= 640px): single-line toolbars, 3D track above the fold, zero overflow */
 @media (max-width: 640px) {
+  .app-main {
+    padding: 0.65rem 0.65rem 2.25rem;
+  }
+
+  .page-stack,
+  .race-page-stack {
+    gap: 0.65rem;
+  }
+
+  .card {
+    padding: 0.85rem;
+    border-radius: 12px;
+  }
+
+  .race-controls-strip {
+    padding: 0.55rem 0.65rem;
+    gap: 0.45rem;
+  }
+
+  .race-controls-primary,
+  .race-controls-secondary {
+    width: 100%;
+    gap: 0.4rem;
+  }
+
+  .race-group-select {
+    max-width: none;
+    padding: 0.38rem 0.55rem;
+    font-size: 0.84rem;
+  }
+
+  .range-segmented .seg-btn {
+    padding: 0.38rem 0.62rem;
+    font-size: 0.8rem;
+  }
+
+  .race-date-input {
+    flex: 1 1 auto;
+    width: auto;
+    padding: 0.36rem 0.5rem;
+    font-size: 0.82rem;
+  }
+
+  .race-today-btn {
+    padding: 0.36rem 0.6rem;
+    font-size: 0.8rem;
+  }
+
+  .race-refresh-btn {
+    padding: 0.38rem 0.5rem;
+  }
+
+  .refresh-btn-text {
+    display: none;
+  }
+
+  /* Velodrome card tight padding so track is immediately visible */
+  .velodrome-card {
+    padding: 0.65rem;
+    gap: 0.65rem;
+  }
+
+  .velodrome-shell {
+    gap: 0.45rem;
+  }
+
+  .cam-btn {
+    padding: 0.34rem 0.48rem;
+    font-size: 0.74rem;
+    gap: 0.22rem;
+  }
+
+  .label-toggle-text {
+    display: none;
+  }
+
+  .label-toggle-btn {
+    padding: 0.34rem 0.46rem;
+  }
+
   .velodrome-viewport,
   .velodrome-loading {
     aspect-ratio: 4 / 3;
+  }
+
+  /* Single-row playback & HUD */
+  .playback-panel {
+    padding: 0.65rem 0.7rem;
+    gap: 0.55rem;
+  }
+
+  .broadcast-hud {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.4rem;
+  }
+
+  .hud-day-label {
+    font-size: 0.84rem;
+  }
+
+  .broadcast-hud-ranks {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 0.1rem;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .broadcast-hud-ranks::-webkit-scrollbar {
+    display: none;
+  }
+
+  .hud-rank-chip {
+    flex-shrink: 0;
+    padding: 0.18rem 0.45rem;
+    font-size: 0.73rem;
   }
 
   .day-markers {
@@ -1177,7 +1770,100 @@ a {
   }
 
   .day-marker-btn {
-    padding: 0.28rem 0.1rem;
+    padding: 0.26rem 0.1rem;
     font-size: 0.7rem;
+  }
+
+  .transport-btn {
+    padding: 0.38rem 0.56rem;
+  }
+
+  .transport-btn-label,
+  .speed-label {
+    display: none;
+  }
+
+  .speed-btn {
+    padding: 0.32rem 0.46rem;
+    font-size: 0.74rem;
+  }
+
+  /* Mobile standings table — zero horizontal scroll */
+  .standings-card {
+    padding: 0.75rem;
+  }
+
+  .standings-hint {
+    display: none;
+  }
+
+  .col-desktop-only {
+    display: none;
+  }
+
+  .race-table th,
+  .race-table td {
+    padding: 0.65rem 0.4rem;
+    font-size: 0.85rem;
+  }
+
+  .leader-word,
+  .racer-slug {
+    display: none;
+  }
+
+  .mini-bar {
+    width: 78px;
+  }
+
+  .breakdown-row td {
+    padding: 0 0.25rem 0.75rem !important;
+  }
+
+  .breakdown-panel {
+    padding: 0.65rem;
+    gap: 0.6rem;
+  }
+
+  .breakdown-metrics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .weekly-bars-grid {
+    gap: 0.2rem;
+  }
+
+  .weekly-bar-col {
+    padding: 0.3rem 0.1rem;
+  }
+
+  .weekly-bar-well {
+    width: 14px;
+    height: 46px;
+  }
+
+  .weekly-bar-pct,
+  .weekly-bar-day {
+    font-size: 0.66rem;
+  }
+
+  .weekly-bar-raw {
+    font-size: 0.6rem;
+  }
+}
+
+/* Ultra-narrow screens (<= 400px): icon-only camera buttons to guarantee single line */
+@media (max-width: 400px) {
+  .cam-btn-label {
+    display: none;
+  }
+
+  .cam-btn {
+    padding: 0.36rem 0.56rem;
+  }
+
+  .nav-link {
+    padding: 0.34rem 0.44rem;
+    font-size: 0.78rem;
   }
 }

@@ -10,6 +10,14 @@ import {
   type RaceTimeline,
   type RiderFrameState,
 } from '../race/trackMath';
+import {
+  LabelIcon,
+  LabelOffIcon,
+  MyLocationIcon,
+  StadiumIcon,
+  TopDownIcon,
+  TrophyIcon,
+} from './Icons';
 import type { PlaybackSpeed } from './PlaybackControls';
 
 export type CameraMode = 'stadium' | 'top' | 'leader' | 'me';
@@ -455,46 +463,61 @@ export default function VelodromeRace3D({
   return (
     <div className="velodrome-shell">
       <div className="velodrome-toolbar">
-        <div className="segmented" role="group" aria-label="Camera perspective">
+        <div className="segmented cam-segmented" role="group" aria-label="Camera perspective">
           <button
             type="button"
             className={cameraMode === 'stadium' ? 'seg-btn cam-btn active' : 'seg-btn cam-btn'}
             onClick={() => onCameraModeChange('stadium')}
+            title="3D Stadium view"
+            aria-label="3D Stadium view"
           >
-            3D Stadium
+            <StadiumIcon size={15} />
+            <span className="cam-btn-label">3D</span>
           </button>
           <button
             type="button"
             className={cameraMode === 'top' ? 'seg-btn cam-btn active' : 'seg-btn cam-btn'}
             onClick={() => onCameraModeChange('top')}
+            title="Top-Down view"
+            aria-label="Top-Down view"
           >
-            Top-Down
+            <TopDownIcon size={15} />
+            <span className="cam-btn-label">Top</span>
           </button>
           <button
             type="button"
             className={cameraMode === 'leader' ? 'seg-btn cam-btn active' : 'seg-btn cam-btn'}
             onClick={() => onCameraModeChange('leader')}
+            title="Follow Leader"
+            aria-label="Follow Leader"
           >
-            Follow Leader
+            <TrophyIcon size={15} />
+            <span className="cam-btn-label">Leader</span>
           </button>
           {hasCurrentUser && (
             <button
               type="button"
               className={cameraMode === 'me' ? 'seg-btn cam-btn active' : 'seg-btn cam-btn'}
               onClick={() => onCameraModeChange('me')}
+              title="Follow Me"
+              aria-label="Follow Me"
             >
-              Follow Me
+              <MyLocationIcon size={15} />
+              <span className="cam-btn-label">Me</span>
             </button>
           )}
         </div>
 
         <button
           type="button"
-          className="btn btn-secondary btn-xs"
+          className={showLabels ? 'btn btn-secondary btn-xs label-toggle-btn active' : 'btn btn-secondary btn-xs label-toggle-btn'}
           onClick={onToggleLabels}
           aria-pressed={showLabels}
+          aria-label={showLabels ? 'Hide rider labels' : 'Show rider labels'}
+          title={showLabels ? 'Hide Labels' : 'Show Labels'}
         >
-          {showLabels ? 'Hide Labels' : 'Show Labels'}
+          {showLabels ? <LabelIcon size={15} /> : <LabelOffIcon size={15} />}
+          <span className="label-toggle-text">{showLabels ? 'Labels' : 'Hidden'}</span>
         </button>
       </div>
 

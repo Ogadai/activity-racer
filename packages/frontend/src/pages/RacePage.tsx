@@ -1,14 +1,27 @@
-import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { getTodayIsoDate, type RaceRange } from '@activity-racer/shared';
+import { getTodayIsoDate, type RaceRange, type RaceStanding } from '@activity-racer/shared';
 import { useGroups, useRace } from '../api/queries';
-import { PlaybackControls, type PlaybackSpeed } from '../components/PlaybackControls';
+import {
+  ChevronDownIcon,
+  FlameIcon,
+  RefreshIcon,
+  StepsIcon,
+  TrophyIcon,
+} from '../components/Icons';
+import {
+  PLAYBACK_SPEEDS,
+  PlaybackControls,
+  type PlaybackSpeed,
+} from '../components/PlaybackControls';
 import type { CameraMode } from '../components/VelodromeRace3D';
 import {
   buildRaceTimeline,
   computeRaceDataSignature,
   computeRaceIdentity,
+  formatDayLabels,
   sampleRaceTimeline,
+  type RaceTimeline,
 } from '../race/trackMath';
 
 const VelodromeRace3D = lazy(() => import('../components/VelodromeRace3D'));
@@ -21,7 +34,59 @@ function formatTime(timestamp: number | string | null): string {
   if (Number.isNaN(date.getTime())) {
     return 'Unknown';
   }
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+const PLAYBACK_PREFS_STORAGE_KEY = 'activity-racer:playback-prefs';
+const VALID_CAMERA_MODES: readonly CameraMode[] = ['stadium', 'top', 'leader', 'me'];
+
+interface PlaybackPreferences {
+  cameraMode: CameraMode;
+  showLabels: boolean;
+  speed: PlaybackSpeed;
+}
+
+const DEFAULT_PLAYBACK_PREFS: PlaybackPreferences = {
+  cameraMode: 'stadium',
+  showLabels: true,
+  speed: 1,
+};
+
+function loadPlaybackPreferences(): PlaybackPreferences {
+  if (typeof window === 'undefined') {
+    return DEFAULT_PLAYBACK_PREFS;
+  }
+  try {
+    const raw = window.localStorage.getItem(PLAYBACK_PREFS_STORAGE_KEY);
+    if (!raw) {
+      return DEFAULT_PLAYBACK_PREFS;
+    }
+    const parsed = JSON.parse(raw) as Partial<Record<keyof PlaybackPreferences, unknown>>;
+    const cameraMode = VALID_CAMERA_MODES.includes(parsed.cameraMode as CameraMode)
+      ? (parsed.cameraMode as CameraMode)
+      : DEFAULT_PLAYBACK_PREFS.cameraMode;
+    const showLabels =
+      typeof parsed.showLabels === 'boolean'
+        ? parsed.showLabels
+        : DEFAULT_PLAYBACK_PREFS.showLabels;
+    const speed = PLAYBACK_SPEEDS.includes(parsed.speed as PlaybackSpeed)
+      ? (parsed.speed as PlaybackSpeed)
+      : DEFAULT_PLAYBACK_PREFS.speed;
+    return { cameraMode, showLabels, speed };
+  } catch {
+    return DEFAULT_PLAYBACK_PREFS;
+  }
+}
+
+function savePlaybackPreferences(prefs: PlaybackPreferences): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  try {
+    window.localStorage.setItem(PLAYBACK_PREFS_STORAGE_KEY, JSON.stringify(prefs));
+  } catch {
+    // Ignore storage quota or private-browsing write errors
+  }
 }
 
 function prefersReducedMotion(): boolean {
@@ -31,20 +96,184 @@ function prefersReducedMotion(): boolean {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
+interface RiderBreakdownPanelProps {
+  row: RaceStanding;
+  range: RaceRange;
+  timeline: RaceTimeline;
+  activeDayIndex: number;
+  onJumpToDay: (dayIndex: number) => void;
+}
+
+function RiderBreakdownPanel({
+  row,
+  range,
+  timeline,
+  activeDayIndex,
+  onJumpToDay,
+}: RiderBreakdownPanelProps) {
+  const stepWeightPct = Math.round(row.stepWeight * 100);
+  const calWeightPct = Math.round(row.calorieWeight * 100);
+  const dailyStepTarget = range === 'weekly' ? Math.round(row.stepTarget / 7) : row.stepTarget;
+  const dailyCalTarget = range === 'weekly' ? Math.round(row.calorieTarget / 7) : row.calorieTarget;
+
+  const stepWeightedContrib = row.stepWeight * row.stepPct;
+  const calWeightedContrib = row.calorieWeight * row.caloriePct;
+
+  return (
+    <div className="breakdown-panel">
+      {/* Personal formula & metadata */}
+      <div className="breakdown-formula-row">
+        <span className="breakdown-formula-text">
+          <strong>Target formula:</strong>{' '}
+          {stepWeightPct}% × Steps / {dailyStepTarget.toLocaleString()}
+          {' + '}
+          {calWeightPct}% × Cal / {dailyCalTarget.toLocaleString()} kcal
+          {range === 'weekly' && ' (÷ 7 days)'}
+        </span>
+        <span className="breakdown-sync-meta muted small">
+          {range === 'weekly' && `${row.daysLogged}/7 days logged · `}
+          Sync: {formatTime(row.lastUpdatedAt)}
+        </span>
+      </div>
+
+      {/* Raw vs. normalized progress metrics */}
+      <div className="breakdown-metrics-grid">
+        <div className="breakdown-metric-card">
+          <div className="breakdown-metric-head">
+            <span className="breakdown-metric-title">
+              <StepsIcon size={15} />
+              <span>Steps</span>
+            </span>
+            <span className="breakdown-metric-pct">
+              <strong>{row.stepPct.toFixed(1)}%</strong>
+              <span className="muted small"> (+{stepWeightedContrib.toFixed(1)} wt)</span>
+            </span>
+          </div>
+          <div className="breakdown-metric-raw">
+            <strong>{row.steps.toLocaleString()}</strong>
+            <span className="muted small"> / {row.stepTarget.toLocaleString()}</span>
+          </div>
+          <div className="breakdown-bar-track" aria-hidden="true">
+            <div
+              className={`breakdown-bar-fill${row.stepPct > 100 ? ' overdrive' : ''}`}
+              style={{
+                width: `${Math.min(100, Math.max(0, row.stepPct))}%`,
+                backgroundColor: row.stepPct > 100 ? undefined : row.bikeColor,
+              }}
+            />
+          </div>
+        </div>
+
+        <div className="breakdown-metric-card">
+          <div className="breakdown-metric-head">
+            <span className="breakdown-metric-title">
+              <FlameIcon size={15} />
+              <span>Active Calories</span>
+            </span>
+            <span className="breakdown-metric-pct">
+              <strong>{row.caloriePct.toFixed(1)}%</strong>
+              <span className="muted small"> (+{calWeightedContrib.toFixed(1)} wt)</span>
+            </span>
+          </div>
+          <div className="breakdown-metric-raw">
+            <strong>{row.activeCalories.toLocaleString()}</strong>
+            <span className="muted small"> / {row.calorieTarget.toLocaleString()} kcal</span>
+          </div>
+          <div className="breakdown-bar-track" aria-hidden="true">
+            <div
+              className={`breakdown-bar-fill${row.caloriePct > 100 ? ' overdrive' : ''}`}
+              style={{
+                width: `${Math.min(100, Math.max(0, row.caloriePct))}%`,
+                backgroundColor: row.caloriePct > 100 ? undefined : row.bikeColor,
+              }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* 7-day Mon-Sun mini bar chart in Weekly mode (click a day to jump the 3D replay) */}
+      {range === 'weekly' && row.dailyBreakdown.length > 0 && (
+        <div className="weekly-bars-section">
+          <div className="weekly-bars-header">
+            <span className="small">
+              <strong>Mon–Sun Daily Pace</strong>
+            </span>
+            <span className="muted small">Tap a day to jump replay · Dashed line = 100%</span>
+          </div>
+
+          <div className="weekly-bars-grid">
+            {row.dailyBreakdown.map((day, idx) => {
+              const timelineDay = timeline.days[idx];
+              const isUpcoming = timelineDay?.isUpcoming ?? false;
+              const isActive = !isUpcoming && idx === activeDayIndex;
+              const { shortLabel } = formatDayLabels(day.date);
+              // Scale chart height up to 150% so 100% sits cleanly at 66.7% height
+              const heightPct = Math.min(100, Math.max(0, (day.weightedScorePct / 150) * 100));
+
+              return (
+                <button
+                  key={day.date}
+                  type="button"
+                  disabled={isUpcoming}
+                  className={`weekly-bar-col${isActive ? ' active' : ''}${
+                    isUpcoming ? ' upcoming' : ''
+                  }${day.isOverdrive ? ' overdrive' : ''}`}
+                  title={`${shortLabel} (${day.date}): ${day.weightedScorePct.toFixed(1)}% · ${day.steps.toLocaleString()} steps · ${day.activeCalories.toLocaleString()} kcal`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!isUpcoming) {
+                      onJumpToDay(idx);
+                    }
+                  }}
+                >
+                  <span className="weekly-bar-pct">
+                    {isUpcoming ? '—' : `${Math.round(day.weightedScorePct)}%`}
+                  </span>
+                  <div className="weekly-bar-well" aria-hidden="true">
+                    <span className="weekly-bar-target-line" />
+                    <div
+                      className={`weekly-bar-stick${day.isOverdrive ? ' overdrive' : ''}`}
+                      style={{
+                        height: `${heightPct}%`,
+                        backgroundColor: day.isOverdrive ? undefined : row.bikeColor,
+                      }}
+                    />
+                  </div>
+                  <span className="weekly-bar-day">{shortLabel}</span>
+                  <span className="weekly-bar-raw">
+                    {day.steps > 0 ? `${(day.steps / 1000).toFixed(1)}k` : '0'}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function RacePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [range, setRange] = useState<RaceRange>('daily');
   const [date, setDate] = useState<string>(() => getTodayIsoDate());
-  const [cameraMode, setCameraMode] = useState<CameraMode>('stadium');
-  const [showLabels, setShowLabels] = useState<boolean>(true);
-  const [speed, setSpeed] = useState<PlaybackSpeed>(1);
+  const initialPrefs = useMemo(() => loadPlaybackPreferences(), []);
+  const [cameraMode, setCameraMode] = useState<CameraMode>(initialPrefs.cameraMode);
+  const [showLabels, setShowLabels] = useState<boolean>(initialPrefs.showLabels);
+  const [speed, setSpeed] = useState<PlaybackSpeed>(initialPrefs.speed);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [uiTimelineT, setUiTimelineT] = useState<number>(0);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
+
+  // Persist user's playback & camera preferences across reloads
+  useEffect(() => {
+    savePlaybackPreferences({ cameraMode, showLabels, speed });
+  }, [cameraMode, showLabels, speed]);
 
   // Refs shared with the 60fps Three.js render loop to avoid per-frame React re-renders
   const timelineTRef = useRef<number>(0);
   const isPlayingRef = useRef<boolean>(false);
-  const speedRef = useRef<PlaybackSpeed>(1);
+  const speedRef = useRef<PlaybackSpeed>(initialPrefs.speed);
   const lastRaceIdentityRef = useRef<string | null>(null);
   const lastDataSignatureRef = useRef<string | null>(null);
 
@@ -214,6 +443,18 @@ export function RacePage() {
     [timeline],
   );
 
+  const toggleRowExpanded = useCallback((userId: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) {
+        next.delete(userId);
+      } else {
+        next.add(userId);
+      }
+      return next;
+    });
+  }, []);
+
   const uiFrame = useMemo(() => {
     if (!timeline) {
       return null;
@@ -222,33 +463,10 @@ export function RacePage() {
   }, [timeline, uiTimelineT]);
 
   const hasCurrentUser = Boolean(raceData?.standings.some((s) => s.isCurrentUser));
+  const isToday = date === getTodayIsoDate();
 
   return (
-    <div className="page-stack">
-      <div className="page-header">
-        <div>
-          <h1>Live Velodrome Race</h1>
-          <p className="subtitle">
-            3D animated velodrome replay synced to daily &amp; weekly weighted activity scores.
-          </p>
-        </div>
-        {raceData && (
-          <div className="refresh-meta">
-            <span className="muted small">
-              Auto-polling every 30s · Updated {formatTime(raceQuery.dataUpdatedAt)}
-            </span>
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              disabled={raceQuery.isFetching}
-              onClick={() => void raceQuery.refetch()}
-            >
-              {raceQuery.isFetching ? 'Refreshing...' : 'Refresh Now'}
-            </button>
-          </div>
-        )}
-      </div>
-
+    <div className="page-stack race-page-stack">
       {groupsQuery.isPending && (
         <div className="card">
           <p className="muted">Loading your racing groups...</p>
@@ -278,10 +496,12 @@ export function RacePage() {
 
       {groups.length > 0 && (
         <>
-          <section className="card controls-bar">
-            <label className="control-field">
-              <span>Group</span>
+          {/* Compact Race Controls Strip (single row on desktop, 2 tight rows on mobile so track starts above the fold) */}
+          <section className="card race-controls-strip" aria-label="Race filters">
+            <div className="race-controls-primary">
               <select
+                className="race-group-select"
+                aria-label="Racing group"
                 value={activeGroupId ?? ''}
                 onChange={(e) => handleGroupChange(e.target.value)}
               >
@@ -291,48 +511,62 @@ export function RacePage() {
                   </option>
                 ))}
               </select>
-            </label>
 
-            <div className="control-field">
-              <span>Range</span>
-              <div className="segmented" role="group" aria-label="Race time range">
+              <div className="segmented range-segmented" role="group" aria-label="Race time range">
                 <button
                   type="button"
                   className={range === 'daily' ? 'seg-btn active' : 'seg-btn'}
                   onClick={() => setRange('daily')}
                 >
-                  Daily
+                  Day
                 </button>
                 <button
                   type="button"
                   className={range === 'weekly' ? 'seg-btn active' : 'seg-btn'}
                   onClick={() => setRange('weekly')}
                 >
-                  Weekly (Mon–Sun)
+                  Week
                 </button>
               </div>
             </div>
 
-            <div className="control-field">
-              <span>Date</span>
-              <div className="date-row">
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      setDate(e.target.value);
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm"
-                  onClick={() => setDate(getTodayIsoDate())}
-                >
-                  Today
-                </button>
-              </div>
+            <div className="race-controls-secondary">
+              <input
+                type="date"
+                className="race-date-input"
+                aria-label="Race date"
+                value={date}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    setDate(e.target.value);
+                  }
+                }}
+              />
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm race-today-btn"
+                disabled={isToday}
+                onClick={() => setDate(getTodayIsoDate())}
+              >
+                Today
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm race-refresh-btn"
+                disabled={raceQuery.isFetching}
+                onClick={() => void raceQuery.refetch()}
+                aria-label="Refresh race standings"
+                title={
+                  raceData
+                    ? `Refresh now · Updated ${formatTime(raceQuery.dataUpdatedAt)} (auto every 30s)`
+                    : 'Refresh standings'
+                }
+              >
+                <RefreshIcon size={16} className={raceQuery.isFetching ? 'icon-spin' : undefined} />
+                <span className="refresh-btn-text">
+                  {raceData ? formatTime(raceQuery.dataUpdatedAt) : 'Sync'}
+                </span>
+              </button>
             </div>
           </section>
 
@@ -355,19 +589,6 @@ export function RacePage() {
           {raceData && timeline && uiFrame && (
             <>
               <section className="card velodrome-card">
-                <div className="section-head">
-                  <div>
-                    <h2>{raceData.group.name}</h2>
-                    <p className="muted small">
-                      {raceData.range === 'weekly'
-                        ? `Week of ${raceData.startDate} to ${raceData.endDate}`
-                        : `Daily race for ${raceData.date}`}
-                      {' · Invite code: '}
-                      <code className="code-inline">{raceData.group.inviteCode}</code>
-                    </p>
-                  </div>
-                </div>
-
                 <Suspense
                   fallback={
                     <div className="velodrome-loading">
@@ -402,91 +623,153 @@ export function RacePage() {
                 />
               </section>
 
-              <section className="card">
-                <div className="section-head">
-                  <h3>Standings</h3>
-                  <span className="muted small">
-                    {raceData.standings.length}{' '}
-                    {raceData.standings.length === 1 ? 'racer' : 'racers'}
-                  </span>
+              <section className="card standings-card">
+                <div className="section-head standings-head">
+                  <div className="standings-title-group">
+                    <h2>Standings</h2>
+                    <span className="muted small">
+                      {raceData.range === 'weekly'
+                        ? `${raceData.startDate} – ${raceData.endDate}`
+                        : raceData.date}
+                    </span>
+                  </div>
+                  <div className="standings-meta-right">
+                    <span className="muted small standings-hint">Tap a rider for breakdown</span>
+                    <code className="code-inline" title="Group invite code">
+                      {raceData.group.inviteCode}
+                    </code>
+                  </div>
                 </div>
 
                 <div className="table-wrap">
                   <table className="race-table">
                     <thead>
                       <tr>
-                        <th>Rank</th>
-                        <th>Racer</th>
-                        <th>Weighted Score</th>
-                        <th>Steps</th>
-                        <th>Active Calories</th>
-                        <th>Last Sync</th>
+                        <th className="col-rank">Rank</th>
+                        <th className="col-racer">Racer</th>
+                        <th className="col-score">Score</th>
+                        <th className="col-steps col-desktop-only">Steps</th>
+                        <th className="col-calories col-desktop-only">Active Cal</th>
+                        <th className="col-sync col-desktop-only">Sync</th>
+                        <th className="col-chevron" aria-label="Details" />
                       </tr>
                     </thead>
                     <tbody>
-                      {raceData.standings.map((row) => (
-                        <tr
-                          key={row.userId}
-                          className={row.isCurrentUser ? 'row-current-user' : undefined}
-                        >
-                          <td>
-                            <span className="rank-num">#{row.rank}</span>
-                            {row.isLeader && <span className="pill pill-gold">Leader</span>}
-                          </td>
-                          <td>
-                            <div className="racer-cell">
-                              <span
-                                className="color-dot"
-                                style={{ backgroundColor: row.bikeColor }}
-                                aria-hidden="true"
-                              />
-                              <div>
-                                <div className="racer-name">
-                                  <strong>{row.displayName}</strong>
-                                  {row.isCurrentUser && <span className="pill pill-blue">You</span>}
+                      {raceData.standings.map((row) => {
+                        const isExpanded = expandedIds.has(row.userId);
+                        const rowClasses = [
+                          'race-row-clickable',
+                          row.isCurrentUser ? 'row-current-user' : '',
+                          row.isLeader ? 'row-leader' : '',
+                          isExpanded ? 'row-expanded' : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' ');
+
+                        return (
+                          <Fragment key={row.userId}>
+                            <tr
+                              className={rowClasses}
+                              onClick={() => toggleRowExpanded(row.userId)}
+                              tabIndex={0}
+                              role="button"
+                              aria-expanded={isExpanded}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  toggleRowExpanded(row.userId);
+                                }
+                              }}
+                            >
+                              <td className="col-rank">
+                                <div className="rank-cell">
+                                  <span className="rank-num">#{row.rank}</span>
+                                  {row.isLeader && (
+                                    <span className="pill pill-gold pill-leader-badge" title="Current Leader">
+                                      <TrophyIcon size={11} />
+                                      <span className="leader-word">Leader</span>
+                                    </span>
+                                  )}
                                 </div>
-                                <span className="muted small">@{row.playerSlug}</span>
-                              </div>
-                            </div>
-                          </td>
-                          <td>
-                            <div className="score-cell">
-                              <strong>{row.weightedScorePct.toFixed(1)}%</strong>
-                              {row.isOverdrive && (
-                                <span className="pill pill-overdrive">OVERDRIVE</span>
-                              )}
-                            </div>
-                            <div className="mini-bar" aria-hidden="true">
-                              <div
-                                className="mini-bar-fill"
-                                style={{
-                                  width: `${Math.min(100, Math.max(0, row.weightedScorePct))}%`,
-                                  backgroundColor: row.bikeColor,
-                                }}
-                              />
-                            </div>
-                          </td>
-                          <td>
-                            <div>
-                              <strong>{row.steps.toLocaleString()}</strong>{' '}
-                              <span className="muted small">
-                                / {row.stepTarget.toLocaleString()}
-                              </span>
-                            </div>
-                            <span className="muted small">{row.stepPct.toFixed(1)}%</span>
-                          </td>
-                          <td>
-                            <div>
-                              <strong>{row.activeCalories.toLocaleString()}</strong>{' '}
-                              <span className="muted small">
-                                / {row.calorieTarget.toLocaleString()} kcal
-                              </span>
-                            </div>
-                            <span className="muted small">{row.caloriePct.toFixed(1)}%</span>
-                          </td>
-                          <td className="muted small">{formatTime(row.lastUpdatedAt)}</td>
-                        </tr>
-                      ))}
+                              </td>
+                              <td className="col-racer">
+                                <div className="racer-cell">
+                                  <span
+                                    className="color-dot"
+                                    style={{ backgroundColor: row.bikeColor }}
+                                    aria-hidden="true"
+                                  />
+                                  <div className="racer-identity">
+                                    <div className="racer-name">
+                                      <strong className="racer-display-name">{row.displayName}</strong>
+                                      {row.isCurrentUser && <span className="pill pill-blue">You</span>}
+                                    </div>
+                                    <span className="muted small racer-slug">@{row.playerSlug}</span>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="col-score">
+                                <div className="score-cell">
+                                  <strong>{row.weightedScorePct.toFixed(1)}%</strong>
+                                  {row.isOverdrive && (
+                                    <span className="pill pill-overdrive">OVERDRIVE</span>
+                                  )}
+                                </div>
+                                <div className="mini-bar" aria-hidden="true">
+                                  <div
+                                    className={`mini-bar-fill${row.isOverdrive ? ' overdrive' : ''}`}
+                                    style={{
+                                      width: `${Math.min(100, Math.max(0, row.weightedScorePct))}%`,
+                                      backgroundColor: row.isOverdrive ? undefined : row.bikeColor,
+                                    }}
+                                  />
+                                </div>
+                              </td>
+                              <td className="col-steps col-desktop-only">
+                                <div>
+                                  <strong>{row.steps.toLocaleString()}</strong>{' '}
+                                  <span className="muted small">
+                                    / {row.stepTarget.toLocaleString()}
+                                  </span>
+                                </div>
+                                <span className="muted small">{row.stepPct.toFixed(1)}%</span>
+                              </td>
+                              <td className="col-calories col-desktop-only">
+                                <div>
+                                  <strong>{row.activeCalories.toLocaleString()}</strong>{' '}
+                                  <span className="muted small">
+                                    / {row.calorieTarget.toLocaleString()} kcal
+                                  </span>
+                                </div>
+                                <span className="muted small">{row.caloriePct.toFixed(1)}%</span>
+                              </td>
+                              <td className="col-sync col-desktop-only muted small">
+                                {formatTime(row.lastUpdatedAt)}
+                              </td>
+                              <td className="col-chevron">
+                                <ChevronDownIcon
+                                  size={18}
+                                  className={isExpanded ? 'row-chevron open' : 'row-chevron'}
+                                />
+                              </td>
+                            </tr>
+
+                            {isExpanded && (
+                              <tr className="breakdown-row">
+                                <td colSpan={7}>
+                                  <RiderBreakdownPanel
+                                    row={row}
+                                    range={raceData.range}
+                                    timeline={timeline}
+                                    activeDayIndex={uiFrame.activeDayIndex}
+                                    onJumpToDay={(dayIndex) => handleScrub(dayIndex)}
+                                  />
+                                </td>
+                              </tr>
+                            )}
+                          </Fragment>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

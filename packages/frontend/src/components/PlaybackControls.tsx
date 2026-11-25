@@ -1,4 +1,5 @@
 import type { RaceTimeline, RaceTimelineFrame } from '../race/trackMath';
+import { PauseIcon, PlayIcon, ReplayIcon, SkipEndIcon } from './Icons';
 
 export const PLAYBACK_SPEEDS = [0.5, 1, 2, 4] as const;
 export type PlaybackSpeed = (typeof PLAYBACK_SPEEDS)[number];
@@ -37,10 +38,10 @@ export function PlaybackControls({
         <div className="broadcast-hud-day">
           <span className={isPlaying ? 'hud-status-dot live' : 'hud-status-dot'} aria-hidden="true" />
           <span className="hud-day-label">
-            {frame.activeDay?.fullLabel ?? (timeline.range === 'weekly' ? 'Weekly Race' : 'Daily Race')}
+            {frame.activeDay?.fullLabel ?? (timeline.range === 'weekly' ? 'Weekly' : 'Daily')}
           </span>
           <span className="hud-state-tag">
-            {isPlaying ? 'Playing' : isAtFinish ? 'Finish' : 'Paused'}
+            {isPlaying ? 'Live' : isAtFinish ? 'Finish' : 'Paused'}
           </span>
         </div>
 
@@ -102,7 +103,6 @@ export function PlaybackControls({
                   onClick={() => onScrub(day.index)}
                 >
                   <span>{day.shortLabel}</span>
-                  {day.isUpcoming && <span className="day-marker-sub">Soon</span>}
                 </button>
               );
             })}
@@ -110,11 +110,9 @@ export function PlaybackControls({
         ) : (
           <div className="daily-markers">
             <button type="button" className="day-marker-link" onClick={() => onScrub(0)}>
-              Start (0%)
+              Start
             </button>
-            <span className="muted small">
-              {Math.round(frame.progress * 100)}% of replay
-            </span>
+            <span className="muted small">{Math.round(frame.progress * 100)}%</span>
             <button type="button" className="day-marker-link" onClick={() => onScrub(maxT)}>
               Finish
             </button>
@@ -122,38 +120,46 @@ export function PlaybackControls({
         )}
       </div>
 
-      {/* Transport & Speed Controls */}
+      {/* Single-line Transport & Speed Controls */}
       <div className="transport-bar">
         <div className="transport-buttons">
           <button
             type="button"
-            className="btn btn-primary btn-sm"
+            className="btn btn-primary btn-sm transport-btn"
             onClick={onTogglePlay}
-            aria-label={isPlaying ? 'Pause race animation' : 'Play race animation'}
+            aria-label={isPlaying ? 'Pause race animation' : isAtFinish ? 'Play again' : 'Play race animation'}
+            title={isPlaying ? 'Pause' : isAtFinish ? 'Play Again' : 'Play'}
           >
-            {isPlaying ? 'Pause' : isAtFinish ? 'Play Again' : 'Play'}
+            {isPlaying ? <PauseIcon size={17} /> : <PlayIcon size={17} />}
+            <span className="transport-btn-label">
+              {isPlaying ? 'Pause' : isAtFinish ? 'Play Again' : 'Play'}
+            </span>
           </button>
           <button
             type="button"
-            className="btn btn-secondary btn-sm"
+            className="btn btn-secondary btn-sm transport-btn"
             onClick={onReplay}
             aria-label="Replay race from start"
+            title="Replay"
           >
-            Replay
+            <ReplayIcon size={17} />
+            <span className="transport-btn-label">Replay</span>
           </button>
           <button
             type="button"
-            className="btn btn-secondary btn-sm"
+            className="btn btn-secondary btn-sm transport-btn"
             onClick={onSkipToFinish}
             disabled={isAtFinish && !isPlaying}
             aria-label="Skip to final standings"
+            title="Skip to Finish"
           >
-            Skip to Finish
+            <SkipEndIcon size={17} />
+            <span className="transport-btn-label">Finish</span>
           </button>
         </div>
 
         <div className="speed-control">
-          <span className="muted small">Speed</span>
+          <span className="muted small speed-label">Speed</span>
           <div className="segmented" role="group" aria-label="Playback speed">
             {PLAYBACK_SPEEDS.map((s) => (
               <button
@@ -162,7 +168,7 @@ export function PlaybackControls({
                 className={speed === s ? 'seg-btn speed-btn active' : 'seg-btn speed-btn'}
                 onClick={() => onSpeedChange(s)}
               >
-                {s}x
+                {s}×
               </button>
             ))}
           </div>
