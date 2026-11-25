@@ -68,10 +68,10 @@ interface PlaybackPreferences {
 
 const DEFAULT_PLAYBACK_PREFS: PlaybackPreferences = {
   groupId: null,
-  range: 'daily',
+  range: 'weekly',
   dateMode: 'today',
   customDate: null,
-  cameraMode: 'stadium',
+  cameraMode: 'me',
   showLabels: true,
   speed: 1,
   commentaryEnabled: true,
