@@ -1,0 +1,193 @@
+/*
+ * Activity Racer — Core Theme Tokens
+ *
+ * All UI colours are defined here as purpose-named CSS custom properties.
+ * Light theme is the default (:root); dark theme activates automatically
+ * via the user's browser/OS preference (@media (prefers-color-scheme: dark)).
+ *
+ * Brand starting palette:
+ *   Primary (Blue):   #5288B5 | lighter #3EA2DD | darker #455665
+ *   Secondary (Gold): #E49756 | lighter #FBE2B0 | darker #DF914E
+ *   Error (Red):      #C02025
+ */
+
+:root {
+  color-scheme: light;
+  accent-color: var(--color-primary);
+
+  /* Brand — Primary */
+  --color-primary: #5288b5;
+  --color-primary-light: #3ea2dd;
+  --color-primary-dark: #455665;
+  --color-primary-hover: #455665;
+  --color-text-on-primary: #ffffff;
+  --color-primary-subtle-bg: #eaf3fa;
+  --color-primary-subtle-border: #bdd7ec;
+  --color-primary-subtle-text: #2e5270;
+
+  /* Brand — Secondary */
+  --color-secondary: #e49756;
+  --color-secondary-light: #fbe2b0;
+  --color-secondary-dark: #df914e;
+  --color-secondary-hover: #df914e;
+  --color-text-on-secondary: #1b2631;
+  --color-secondary-subtle-bg: #fbe2b0;
+  --color-secondary-subtle-border: #e49756;
+  --color-secondary-subtle-text: #7a4312;
+
+  /* Semantic — Error / Danger */
+  --color-error: #c02025;
+  --color-error-hover: #9e1a1e;
+  --color-text-on-error: #ffffff;
+  --color-error-subtle-bg: #fdf0f0;
+  --color-error-subtle-border: #e8a6a8;
+  --color-error-subtle-text: #9a181c;
+
+  /* Semantic — Success */
+  --color-success: #237a4b;
+  --color-success-subtle-bg: #ecf8f1;
+  --color-success-subtle-border: #9bd8b6;
+  --color-success-subtle-text: #185a36;
+
+  /* Semantic — Info */
+  --color-info-subtle-bg: #eaf3fa;
+  --color-info-subtle-border: #bdd7ec;
+  --color-info-subtle-text: #2e5270;
+
+  /* Semantic — Overdrive Accent (>100% score) */
+  --color-overdrive-subtle-bg: #f5e8fa;
+  --color-overdrive-subtle-text: #7a248f;
+
+  /* Surfaces & Backgrounds */
+  --color-bg-page: #f2f5f8;
+  --color-bg-surface: #ffffff;
+  --color-bg-surface-subtle: #f7f9fb;
+  --color-bg-hover: #ebf0f5;
+  --color-bg-input: #ffffff;
+  --color-bg-code-inline: #ebf0f5;
+  --color-bg-code-block: #18212a;
+
+  /* Typography */
+  --color-text-primary: #1b2631;
+  --color-text-secondary: #455665;
+  --color-text-muted: #5f7182;
+  --color-text-code-inline: #2e3d4b;
+  --color-text-code-block: #e3ecf4;
+
+  /* Borders & Dividers */
+  --color-border-subtle: #dce4ec;
+  --color-border-default: #c2cfd9;
+  --color-border-code-block: #2a3846;
+
+  /* Controls & Interactive States */
+  --color-focus-ring: rgba(62, 162, 221, 0.45);
+  --color-btn-secondary-bg: #f7f9fb;
+  --color-btn-secondary-text: #1b2631;
+  --color-btn-secondary-hover-bg: #e5ecf2;
+  --color-btn-oauth-bg: #ffffff;
+  --color-btn-oauth-text: #1b2631;
+  --color-btn-oauth-hover-bg: #f7f9fb;
+  --color-pill-neutral-bg: #e5ecf2;
+  --color-pill-neutral-text: #455665;
+  --color-row-highlight-bg: #edf5fc;
+  --color-progress-track: #dce4ec;
+  --color-spinner-track: #c2cfd9;
+  --color-swatch-selected-border: #1b2631;
+  --color-swatch-selected-ring: #ffffff;
+
+  /* Elevation Shadows */
+  --color-shadow-card: rgba(27, 38, 49, 0.06);
+  --color-shadow-control: rgba(27, 38, 49, 0.08);
+  --color-shadow-control-hover: rgba(27, 38, 49, 0.14);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    /* Brand — Primary (lifted to lighter blue for dark-surface contrast) */
+    --color-primary: #3ea2dd;
+    --color-primary-light: #64b8e8;
+    --color-primary-dark: #455665;
+    --color-primary-hover: #5bb3e6;
+    --color-text-on-primary: #0d151c;
+    --color-primary-subtle-bg: rgba(82, 136, 181, 0.22);
+    --color-primary-subtle-border: rgba(62, 162, 221, 0.42);
+    --color-primary-subtle-text: #8ccef5;
+
+    /* Brand — Secondary */
+    --color-secondary: #e49756;
+    --color-secondary-light: #fbe2b0;
+    --color-secondary-dark: #df914e;
+    --color-secondary-hover: #eeaa70;
+    --color-text-on-secondary: #161d24;
+    --color-secondary-subtle-bg: rgba(228, 151, 86, 0.2);
+    --color-secondary-subtle-border: rgba(228, 151, 86, 0.45);
+    --color-secondary-subtle-text: #fbe2b0;
+
+    /* Semantic — Error / Danger */
+    --color-error: #c02025;
+    --color-error-hover: #d62b31;
+    --color-text-on-error: #ffffff;
+    --color-error-subtle-bg: rgba(192, 32, 37, 0.22);
+    --color-error-subtle-border: rgba(235, 92, 97, 0.5);
+    --color-error-subtle-text: #f79a9d;
+
+    /* Semantic — Success */
+    --color-success: #34b371;
+    --color-success-subtle-bg: rgba(52, 179, 113, 0.18);
+    --color-success-subtle-border: rgba(52, 179, 113, 0.45);
+    --color-success-subtle-text: #7be0aa;
+
+    /* Semantic — Info */
+    --color-info-subtle-bg: rgba(82, 136, 181, 0.2);
+    --color-info-subtle-border: rgba(62, 162, 221, 0.42);
+    --color-info-subtle-text: #9ad3f6;
+
+    /* Semantic — Overdrive Accent (>100% score) */
+    --color-overdrive-subtle-bg: rgba(196, 118, 232, 0.22);
+    --color-overdrive-subtle-text: #e6b3fb;
+
+    /* Surfaces & Backgrounds */
+    --color-bg-page: #11181f;
+    --color-bg-surface: #18222c;
+    --color-bg-surface-subtle: #202d3a;
+    --color-bg-hover: #293848;
+    --color-bg-input: #141c24;
+    --color-bg-code-inline: #243240;
+    --color-bg-code-block: #0d1319;
+
+    /* Typography */
+    --color-text-primary: #eef4f9;
+    --color-text-secondary: #b9c8d6;
+    --color-text-muted: #8ca0b3;
+    --color-text-code-inline: #dce8f2;
+    --color-text-code-block: #e3ecf4;
+
+    /* Borders & Dividers */
+    --color-border-subtle: #2a3847;
+    --color-border-default: #3c4f61;
+    --color-border-code-block: #263442;
+
+    /* Controls & Interactive States */
+    --color-focus-ring: rgba(62, 162, 221, 0.55);
+    --color-btn-secondary-bg: #202d3a;
+    --color-btn-secondary-text: #eef4f9;
+    --color-btn-secondary-hover-bg: #2b3b4c;
+    --color-btn-oauth-bg: #202d3a;
+    --color-btn-oauth-text: #eef4f9;
+    --color-btn-oauth-hover-bg: #2b3b4c;
+    --color-pill-neutral-bg: #293848;
+    --color-pill-neutral-text: #c8d6e3;
+    --color-row-highlight-bg: rgba(82, 136, 181, 0.18);
+    --color-progress-track: #2d3d4e;
+    --color-spinner-track: #344658;
+    --color-swatch-selected-border: #eef4f9;
+    --color-swatch-selected-ring: #18222c;
+
+    /* Elevation Shadows */
+    --color-shadow-card: rgba(0, 0, 0, 0.35);
+    --color-shadow-control: rgba(0, 0, 0, 0.3);
+    --color-shadow-control-hover: rgba(0, 0, 0, 0.45);
+  }
+}

@@ -7,7 +7,7 @@ export function NavBar() {
   const { data: profile } = useProfile();
 
   const displayLabel = profile?.displayName ?? user?.name ?? user?.email ?? 'Racer';
-  const bikeColor = profile?.bikeColor ?? '#2563eb';
+  const bikeColor = profile?.bikeColor ?? 'var(--color-primary)';
 
   return (
     <header className="navbar">

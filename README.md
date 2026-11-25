@@ -15,7 +15,7 @@ Activity Racer is built on AWS serverless services designed for **$0 idle cost**
 - **Amazon API Gateway (HTTP API):** Serves backend endpoints under `/api/*` (to prevent path collisions with React Router SPA routes).
 - **AWS Lambda (TypeScript, Node.js 22, ARM64):** Handles API logic and Home Assistant webhook ingestion, bundled locally with `esbuild`.
 - **Amazon DynamoDB (On-Demand):** Single-table store (`PK`/`SK` + `GSI1`) for player profiles, groups, memberships, and daily activity stats.
-- **Amazon Cognito:** User Pool (`activity-racer-users`) + public SPA client (`activity-racer-spa`) paired with API Gateway's built-in JWT Authorizer (`event.requestContext.authorizer.jwt.claims.sub`).
+- **Amazon Cognito:** User Pool (`activity-racer-users`), Managed Login v2 domain, Google OAuth2 identity provider, and public PKCE SPA client (`activity-racer-spa`, no client secret) paired with API Gateway's built-in JWT Authorizer (`event.requestContext.authorizer.jwt.claims.sub`).
 - **Amazon S3 (Private) + SPA Hosting:** Built Vite assets and a CDK-generated runtime `/config.json` are stored in a private S3 bucket:
   - **Default (Option B3):** Served over HTTPS via a lightweight read-only `SpaHostingFunction` Lambda (`GET /`, `GET /{proxy+}`) on the existing HTTP API Gateway while CloudFront project verification is pending.
   - **CloudFront OAC:** Enable with `-c enableCloudFront=true` to place a CloudFront distribution with Origin Access Control in front of the private S3 bucket (using 403/404 → `/index.html` error responses for SPA routing, with no Lambda@Edge).
@@ -55,12 +55,13 @@ activity-racer/
   - `src/handlers/spa.ts` — Option B3 static SPA server reading from the private frontend S3 bucket with path-traversal guards, `/api/*` 404 isolation, MIME/binary handling, immutable caching for `/assets/*`, `no-store` for `index.html`/`config.json`, and extensionless SPA fallback to `index.html`.
 
 ### 3. `packages/frontend` (`@activity-racer/frontend`)
-- **Purpose:** Static Single Page Application built with React 19, Vite, and TypeScript.
+- **Purpose:** Static Single Page Application built with React 19, Vite, React Router, TanStack Query, and TypeScript.
 - **Design:**
-  - Loads `/config.json` at runtime (`src/config.ts`) so the same built bundle adapts automatically to each deployment's API URL (and Cognito IDs in Phase 2) without manual `.env` copying.
-  - Supports `VITE_API_URL` / `VITE_AWS_REGION` overrides for local `vite dev`.
-- **Current UI:** Phase 1 walking skeleton card (`src/App.tsx`) verifying live `/config.json` and `GET /api/health` connectivity.
-- **Planned additions (Phases 3–4):** Cognito auth flows, TanStack Query API hooks with Bearer tokens & polling, React Router views (`/login`, `/race`, `/groups`, `/settings`), and the visual cycling race track UI.
+  - Loads `/config.json` at runtime (`src/config.ts`) so the same built bundle adapts automatically to each deployment's API URL and Cognito IDs without rebuilding.
+  - Supports `VITE_*` overrides in a gitignored `packages/frontend/.env.local` file for local `vite dev` (see [Local Frontend Development](#local-frontend-development) below).
+  - Implements OAuth 2.0 Authorization Code + PKCE (`S256`) with `state`/`nonce` checks, silent token refresh, and full `/oauth2/revoke` + `/logout` sign-out (`src/auth/cognitoOAuth.ts`).
+- **Current UI (Phase 3):** `/login` ("Continue with Google"), `/auth/callback`, `/groups` (create/join + copy invite codes), `/settings` (profile, fair handicapping targets/weights, webhook API key management, and copyable Home Assistant YAML), and `/race` (wired leaderboard table with 30s auto-polling).
+- **Planned additions (Phase 4):** Visual cycling race track UI with positioned bikes, 100% finish line, overdrive badges, and expandable stat breakdowns.
 
 ### 4. `packages/infra` (`@activity-racer/infra`)
 - **Purpose:** AWS CDK (TypeScript) Infrastructure as Code defining a single cohesive `ActivityRacerStack` for reliable deploy and teardown.
@@ -78,6 +79,46 @@ activity-racer/
 | **Group** | `GROUP#<groupId>` | `META` | `INVITE#<inviteCode>` | `GROUP#<groupId>` | Group name & invite-code lookup |
 | **Membership** | `GROUP#<groupId>` | `MEMBER#<cognitoSub>` | `USER#<cognitoSub>` | `GROUP#<groupId>` | Group roster & "my groups" lookup |
 | **Daily Stat** | `USER#<cognitoSub>` | `STAT#<YYYY-MM-DD>` | — | — | Daily steps & active calories upserts from HA |
+
+---
+
+## Local Frontend Development
+
+In AWS, CDK generates and deploys `/config.json` automatically alongside the SPA. When running Vite locally (`http://localhost:5173`), `/config.json` does not exist, so you provide the deployed stack's **public** endpoints and Cognito identifiers via a gitignored `.env.local` file:
+
+1. Copy the template file:
+   ```bash
+   cp packages/frontend/.env.example packages/frontend/.env.local
+   ```
+   *(On Windows PowerShell: `Copy-Item packages\frontend\.env.example packages\frontend\.env.local`)*
+2. Open `packages/frontend/.env.local` and fill in the values from your `ActivityRacerStack` CDK deploy outputs (or from your deployed site's `/config.json`):
+   - `VITE_API_URL` ← `ApiUrl`
+   - `VITE_AWS_REGION` ← `eu-north-1`
+   - `VITE_USER_POOL_ID` ← `UserPoolId`
+   - `VITE_USER_POOL_CLIENT_ID` ← `UserPoolClientId`
+   - `VITE_COGNITO_DOMAIN` ← `CognitoDomain`
+   - `VITE_GOOGLE_AUTH_ENABLED` ← `true` (once Google IdP is configured in Cognito)
+3. Start the local dev server:
+   ```bash
+   npm run dev:frontend
+   ```
+   Open `http://localhost:5173`. Both `http://localhost:5173/auth/callback` and `http://localhost:5173/login` are pre-registered on the Cognito SPA client, so **Continue with Google** works locally as well as in AWS.
+
+> **Security note:** Never place secrets (such as your Google OAuth Client Secret or Home Assistant webhook keys) in `.env.example`, `.env.local`, or `cdk.json`. All `VITE_*` variables above are public browser identifiers. If you tear down and redeploy the stack (`npm run cdk:destroy` → `npm run cdk:deploy`), update `.env.local` with the newly generated stack outputs.
+
+---
+
+## Google OAuth2 Setup (Cognito Federation)
+
+To enable **Continue with Google** on a fresh deployment without storing secrets in git or CloudFormation:
+
+1. Deploy the stack first (`npm run cdk:deploy`) to provision the Cognito Managed Login domain and print `GoogleJavaScriptOrigin` and `GoogleRedirectUri` in the CDK outputs.
+2. In **Google Cloud Console → APIs & Services → Credentials**, create an **OAuth 2.0 Client ID** (type **Web application**) using the printed `GoogleJavaScriptOrigin` and `GoogleRedirectUri` (`https://<cognito-domain>/oauth2/idpresponse`).
+3. In the **AWS Management Console → Amazon Cognito** (`eu-north-1`) → your User Pool → **Social and external providers**, add **Google** with your Client ID, Client Secret, scopes `openid email profile`, and attribute mappings:
+   - `email` → `email`
+   - `email_verified` → `email_verified`
+   - `name` → `name`
+4. Ensure `"enableGoogleAuth": "true"` is set under `"context"` in `packages/infra/cdk.json` (or pass `-c enableGoogleAuth=true`) and run `npm run cdk:deploy`.
 
 ---
 

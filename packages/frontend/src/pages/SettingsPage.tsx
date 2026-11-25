@@ -50,7 +50,7 @@ export function SettingsPage() {
 
   const [displayName, setDisplayName] = useState('');
   const [playerSlug, setPlayerSlug] = useState('');
-  const [bikeColor, setBikeColor] = useState('#2563eb');
+  const [bikeColor, setBikeColor] = useState('#5288b5');
   const [dailyStepTarget, setDailyStepTarget] = useState('10000');
   const [dailyCalorieTarget, setDailyCalorieTarget] = useState('500');
   const [stepWeightPct, setStepWeightPct] = useState(50);
@@ -103,7 +103,7 @@ export function SettingsPage() {
     if (!HEX_COLOR_REGEX.test(normalizedColor)) {
       setSaveMessage({
         kind: 'err',
-        text: 'Bike color must be a valid 6-digit hex color (e.g. #2563eb).',
+        text: 'Bike color must be a valid 6-digit hex color (e.g. #5288b5).',
       });
       return;
     }
@@ -250,7 +250,7 @@ export function SettingsPage() {
               ))}
               <input
                 type="color"
-                value={HEX_COLOR_REGEX.test(bikeColor) ? bikeColor : '#2563eb'}
+                value={HEX_COLOR_REGEX.test(bikeColor) ? bikeColor : '#5288b5'}
                 onChange={(e) => setBikeColor(e.target.value)}
                 aria-label="Custom bike color"
                 className="color-picker-input"
