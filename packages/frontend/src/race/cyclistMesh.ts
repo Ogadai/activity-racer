@@ -442,9 +442,10 @@ export function createCyclistRig(userId: string, initialColor: string): CyclistR
       if (effectiveLapsPerSec > 0.0005 && dtSec > 0) {
         const worldSpeed = effectiveLapsPerSec * pose.perimeter;
         wheelAngle += (worldSpeed / WHEEL_RADIUS) * dtSec;
-        // Pedaling cadence (rad/s) smoothly proportional to speed
-        const cadenceRadPerSec = Math.min(26, effectiveLapsPerSec * 18.5);
-        crankPhase = (crankPhase + cadenceRadPerSec * dtSec) % (Math.PI * 2);
+        // Forward pedaling cadence (rad/s): decrementing phase moves pedal top -> front (+Z) -> bottom -> back
+        const cadenceRadPerSec = Math.min(52, effectiveLapsPerSec * 37);
+        const twoPi = Math.PI * 2;
+        crankPhase = (((crankPhase - cadenceRadPerSec * dtSec) % twoPi) + twoPi) % twoPi;
       }
 
       frontWheel.rotation.x = wheelAngle;
