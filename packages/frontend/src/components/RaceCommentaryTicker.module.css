@@ -52,6 +52,20 @@
   font-weight: 500;
 }
 
+.staleBanner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.65rem;
+}
+
+.updateBtn {
+  flex-shrink: 0;
+  padding: 0.16rem 0.55rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
 .fadeIn {
   animation: commentaryFade 0.28s ease-out;
 }

@@ -612,3 +612,95 @@ export function computeRaceDataSignature(race: RaceResponse): string {
     .join(';');
   return `${computeRaceIdentity(race)}::${rows}`;
 }
+
+/**
+ * Deterministic fingerprint of the narrative-defining race outcome (active days, daily leaders,
+ * daily rank order, overdrive status, active/resting state, and rider names), intentionally
+ * excluding raw step/calorie/lap magnitudes. Mirrors backend `computeOutcomeHash` so minor step
+ * trickles do not mark commentary stale, while rank/leader/winner/overdrive/first-activity
+ * changes do.
+ */
+export function computeRaceOutcomeSignature(
+  race: RaceResponse,
+  options?: { todayIso?: string },
+): string {
+  const todayIso = options?.todayIso ?? getLocalTodayIsoDate();
+  const templateBreakdown = race.standings[0]?.dailyBreakdown ?? [];
+  const rawDates =
+    templateBreakdown.length > 0 ? templateBreakdown.map((d) => d.date) : [race.date];
+
+  let activeCount = rawDates.length;
+  if (race.range === 'weekly' && rawDates.length > 1) {
+    const start = rawDates[0];
+    const end = rawDates[rawDates.length - 1];
+    if (todayIso >= start && todayIso <= end) {
+      let lastIdx = rawDates.findIndex((d) => d === todayIso);
+      if (lastIdx < 0) lastIdx = rawDates.length - 1;
+      for (const s of race.standings) {
+        s.dailyBreakdown.forEach((entry, idx) => {
+          if (entry.weightedScorePct > 0 && idx > lastIdx) {
+            lastIdx = idx;
+          }
+        });
+      }
+      activeCount = Math.max(1, lastIdx + 1);
+    } else if (todayIso < start) {
+      activeCount = 1;
+    }
+  } else {
+    activeCount = 1;
+  }
+
+  const activeDates = rawDates.slice(0, activeCount);
+  const cumulativeByUser = new Map<string, number>();
+  let hasAnyActivity = false;
+
+  const dayTokens = activeDates.map((date, dayIdx) => {
+    const entries = race.standings.map((standing) => {
+      const breakdown = standing.dailyBreakdown[dayIdx];
+      const dayPct = breakdown ? breakdown.weightedScorePct : 0;
+      const dayLaps = Math.round(Math.max(0, dayPct / 100) * 100) / 100;
+      if (dayLaps > 0) {
+        hasAnyActivity = true;
+      }
+      const nextCum = Math.round(((cumulativeByUser.get(standing.userId) ?? 0) + dayLaps) * 100) / 100;
+      cumulativeByUser.set(standing.userId, nextCum);
+
+      return {
+        userId: standing.userId,
+        displayName: standing.displayName.trim(),
+        cumulativeLaps: nextCum,
+        inOverdrive: dayLaps > 1,
+        resting: dayLaps === 0,
+        finalRankTiebreak: standing.rank,
+      };
+    });
+
+    entries.sort((a, b) => {
+      if (b.cumulativeLaps !== a.cumulativeLaps) {
+        return b.cumulativeLaps - a.cumulativeLaps;
+      }
+      return a.finalRankTiebreak - b.finalRankTiebreak;
+    });
+
+    const topCum = entries[0]?.cumulativeLaps ?? 0;
+    const leaders =
+      topCum > 0
+        ? entries
+            .filter((e) => e.cumulativeLaps === topCum)
+            .map((e) => e.userId)
+            .join(',')
+        : '';
+
+    const riders = entries
+      .map(
+        (e, idx) =>
+          `${idx + 1}:${e.userId}:${e.displayName}:${e.inOverdrive ? 1 : 0}:${e.resting ? 1 : 0}`,
+      )
+      .join(',');
+
+    return `${date}|L=${leaders}|R=${riders}`;
+  });
+
+  return `${computeRaceIdentity(race)}::A=${hasAnyActivity ? 1 : 0}::${dayTokens.join(';')}`;
+}

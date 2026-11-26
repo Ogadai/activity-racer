@@ -115,6 +115,7 @@ export interface RaceCommentaryItem {
   startDate: string;
   endDate: string;
   dataHash: string;
+  outcomeHash?: string;
   promptVersion?: number;
   headline: string;
   days: RaceCommentaryDay[];

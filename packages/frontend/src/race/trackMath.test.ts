@@ -8,6 +8,7 @@ import {
   computeLaneOffset,
   computeRaceDataSignature,
   computeRaceIdentity,
+  computeRaceOutcomeSignature,
   evaluateTrackPose,
   sampleRaceTimeline,
 } from './trackMath.ts';
@@ -363,5 +364,104 @@ describe('multi-day race timeline interpolation', () => {
     assert.equal(computeRaceIdentity(base), computeRaceIdentity(pollSame));
     assert.equal(computeRaceDataSignature(base), computeRaceDataSignature(pollSame));
     assert.notEqual(computeRaceDataSignature(base), computeRaceDataSignature(pollUpdated));
+  });
+
+  it('keeps outcome signature stable on minor score trickles but changes when winner, rank, overdrive, or first activity changes', () => {
+    const base: RaceResponse = {
+      group: { groupId: 'g1', name: 'Club', inviteCode: 'ABC' },
+      range: 'daily',
+      date: '2026-11-24',
+      startDate: '2026-11-24',
+      endDate: '2026-11-24',
+      generatedAt: '2026-11-24T12:00:00Z',
+      standings: [
+        makeStanding({
+          userId: 'u1',
+          displayName: 'Alex',
+          rank: 1,
+          isLeader: true,
+          dailyScores: [{ date: '2026-11-24', pct: 80 }],
+        }),
+        makeStanding({
+          userId: 'u2',
+          displayName: 'Sam',
+          rank: 2,
+          dailyScores: [{ date: '2026-11-24', pct: 50 }],
+        }),
+      ],
+    };
+
+    // Minor step trickle: Alex 80% -> 84%, Sam 50% -> 53% (same ranks, leader, overdrive)
+    const minorTrickle: RaceResponse = {
+      ...base,
+      generatedAt: '2026-11-24T12:00:30Z',
+      standings: [
+        makeStanding({
+          userId: 'u1',
+          displayName: 'Alex',
+          rank: 1,
+          isLeader: true,
+          dailyScores: [{ date: '2026-11-24', pct: 84 }],
+        }),
+        makeStanding({
+          userId: 'u2',
+          displayName: 'Sam',
+          rank: 2,
+          dailyScores: [{ date: '2026-11-24', pct: 53 }],
+        }),
+      ],
+    };
+
+    // Lead flip: Sam surges past Alex
+    const leadFlip: RaceResponse = {
+      ...base,
+      generatedAt: '2026-11-24T12:01:00Z',
+      standings: [
+        makeStanding({
+          userId: 'u2',
+          displayName: 'Sam',
+          rank: 1,
+          isLeader: true,
+          dailyScores: [{ date: '2026-11-24', pct: 92 }],
+        }),
+        makeStanding({
+          userId: 'u1',
+          displayName: 'Alex',
+          rank: 2,
+          dailyScores: [{ date: '2026-11-24', pct: 84 }],
+        }),
+      ],
+    };
+
+    // Overdrive entry: Alex crosses 100%
+    const overdriveEntry: RaceResponse = {
+      ...base,
+      generatedAt: '2026-11-24T12:01:30Z',
+      standings: [
+        makeStanding({
+          userId: 'u1',
+          displayName: 'Alex',
+          rank: 1,
+          isLeader: true,
+          dailyScores: [{ date: '2026-11-24', pct: 105 }],
+        }),
+        makeStanding({
+          userId: 'u2',
+          displayName: 'Sam',
+          rank: 2,
+          dailyScores: [{ date: '2026-11-24', pct: 50 }],
+        }),
+      ],
+    };
+
+    const baseOutcome = computeRaceOutcomeSignature(base, { todayIso: '2026-11-24' });
+    const trickleOutcome = computeRaceOutcomeSignature(minorTrickle, { todayIso: '2026-11-24' });
+    const flipOutcome = computeRaceOutcomeSignature(leadFlip, { todayIso: '2026-11-24' });
+    const overdriveOutcome = computeRaceOutcomeSignature(overdriveEntry, { todayIso: '2026-11-24' });
+
+    assert.notEqual(computeRaceDataSignature(base), computeRaceDataSignature(minorTrickle));
+    assert.equal(baseOutcome, trickleOutcome);
+    assert.notEqual(baseOutcome, flipOutcome);
+    assert.notEqual(baseOutcome, overdriveOutcome);
   });
 });

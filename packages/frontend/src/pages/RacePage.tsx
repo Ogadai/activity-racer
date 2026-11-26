@@ -4,6 +4,7 @@ import {
   getTodayIsoDate,
   isValidIsoDate,
   type RaceRange,
+  type RaceResponse,
   type RaceStanding,
 } from '@activity-racer/shared';
 import { useGroups, useRace, useRaceCommentary } from '../api/queries';
@@ -28,6 +29,7 @@ import {
   buildRaceTimeline,
   computeRaceDataSignature,
   computeRaceIdentity,
+  computeRaceOutcomeSignature,
   formatDayLabels,
   sampleRaceTimeline,
   type RaceTimeline,
@@ -51,6 +53,15 @@ function formatTime(timestamp: number | string | null): string {
 const PLAYBACK_PREFS_STORAGE_KEY = 'activity-racer:playback-prefs';
 const VALID_CAMERA_MODES: readonly CameraMode[] = ['stadium', 'top', 'leader', 'me'];
 const VALID_RANGES: readonly RaceRange[] = ['daily', 'weekly'];
+
+interface SyncedCommentarySignature {
+  outcomeSig: string;
+  dataSig: string;
+  dataUpdatedAt: number;
+}
+
+// Persists across route navigation so returning to /race detects stale React Query commentary
+const syncedCommentaryByRace = new Map<string, SyncedCommentarySignature>();
 
 type DateSelectionMode = 'today' | 'custom';
 
@@ -337,6 +348,8 @@ export function RacePage() {
   const [ttsEnabled, setTtsEnabled] = useState<boolean>(initialPrefs.ttsEnabled);
   const [ttsVoiceUri, setTtsVoiceUri] = useState<string | null>(initialPrefs.ttsVoiceUri);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [pendingPlayStartT, setPendingPlayStartT] = useState<number | null>(null);
+  const [syncedCommentaryVersion, setSyncedCommentaryVersion] = useState<number>(0);
   const [uiTimelineT, setUiTimelineT] = useState<number>(0);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
 
@@ -374,6 +387,11 @@ export function RacePage() {
   const lastRaceIdentityRef = useRef<string | null>(null);
   const lastDataSignatureRef = useRef<string | null>(null);
   const lastSpokenKeyRef = useRef<string | null>(null);
+  const inFlightCommentaryRef = useRef<{
+    identity: string;
+    outcomeSig: string;
+    dataSig: string;
+  } | null>(null);
 
   isPlayingRef.current = isPlaying;
   speedRef.current = speed;
@@ -410,6 +428,110 @@ export function RacePage() {
   // Build stable timeline only when actual race scores/structure change (polling-safe)
   const raceIdentity = raceData ? computeRaceIdentity(raceData) : null;
   const raceSignature = raceData ? computeRaceDataSignature(raceData) : null;
+  const raceOutcomeSignature = raceData ? computeRaceOutcomeSignature(raceData) : null;
+
+  // Track which race outcome/data signature the cached commentary corresponds to
+  useEffect(() => {
+    if (!raceIdentity || !raceOutcomeSignature || !raceSignature) {
+      return;
+    }
+
+    if (commentaryQuery.isFetching) {
+      if (
+        !inFlightCommentaryRef.current ||
+        inFlightCommentaryRef.current.identity !== raceIdentity
+      ) {
+        inFlightCommentaryRef.current = {
+          identity: raceIdentity,
+          outcomeSig: raceOutcomeSignature,
+          dataSig: raceSignature,
+        };
+      }
+      return;
+    }
+
+    if (commentaryQuery.isSuccess && commentaryQuery.dataUpdatedAt > 0) {
+      const existing = syncedCommentaryByRace.get(raceIdentity);
+      if (!existing || existing.dataUpdatedAt !== commentaryQuery.dataUpdatedAt) {
+        const captured =
+          inFlightCommentaryRef.current?.identity === raceIdentity
+            ? inFlightCommentaryRef.current
+            : {
+                identity: raceIdentity,
+                outcomeSig: raceOutcomeSignature,
+                dataSig: raceSignature,
+              };
+        syncedCommentaryByRace.set(raceIdentity, {
+          outcomeSig: captured.outcomeSig,
+          dataSig: captured.dataSig,
+          dataUpdatedAt: commentaryQuery.dataUpdatedAt,
+        });
+        setSyncedCommentaryVersion((v) => v + 1);
+      }
+      inFlightCommentaryRef.current = null;
+      return;
+    }
+
+    if (commentaryQuery.isError) {
+      inFlightCommentaryRef.current = null;
+    }
+  }, [
+    raceIdentity,
+    raceOutcomeSignature,
+    raceSignature,
+    commentaryQuery.isFetching,
+    commentaryQuery.isSuccess,
+    commentaryQuery.isError,
+    commentaryQuery.dataUpdatedAt,
+  ]);
+
+  // Reading syncedCommentaryVersion ensures re-evaluation when module-level map updates
+  const syncedCommentaryEntry = useMemo(() => {
+    void syncedCommentaryVersion;
+    return raceIdentity ? syncedCommentaryByRace.get(raceIdentity) : undefined;
+  }, [raceIdentity, syncedCommentaryVersion]);
+
+  const isCommentaryStale = Boolean(
+    commentaryEnabled &&
+      raceData &&
+      raceOutcomeSignature &&
+      commentaryQuery.data &&
+      syncedCommentaryEntry &&
+      syncedCommentaryEntry.outcomeSig !== raceOutcomeSignature,
+  );
+
+  const triggerCommentaryRefresh = useCallback(
+    (targetRace?: RaceResponse) => {
+      const source = targetRace ?? raceData;
+      if (!commentaryEnabled || !source) {
+        return;
+      }
+      inFlightCommentaryRef.current = {
+        identity: computeRaceIdentity(source),
+        outcomeSig: computeRaceOutcomeSignature(source),
+        dataSig: computeRaceDataSignature(source),
+      };
+      void commentaryQuery.refetch();
+    },
+    [commentaryEnabled, raceData, commentaryQuery],
+  );
+
+  const handleRefresh = useCallback(async () => {
+    const result = await raceQuery.refetch();
+    const nextRace = result.data;
+    if (!commentaryEnabled || !nextRace) {
+      return;
+    }
+    const nextIdentity = computeRaceIdentity(nextRace);
+    const nextDataSig = computeRaceDataSignature(nextRace);
+    const nextOutcomeSig = computeRaceOutcomeSignature(nextRace);
+    const synced = syncedCommentaryByRace.get(nextIdentity);
+    const needsCommentaryRefresh =
+      !synced || synced.outcomeSig !== nextOutcomeSig || synced.dataSig !== nextDataSig;
+    if (needsCommentaryRefresh) {
+      triggerCommentaryRefresh(nextRace);
+    }
+  }, [raceQuery, commentaryEnabled, triggerCommentaryRefresh]);
 
   const timeline = useMemo(() => {
     if (!raceData) {
@@ -433,6 +555,7 @@ export function RacePage() {
     if (identityChanged) {
       cancelSpeech();
       lastSpokenKeyRef.current = null;
+      setPendingPlayStartT(null);
       if (prefersReducedMotion()) {
         timelineTRef.current = timeline.activeSegmentCount;
         setUiTimelineT(timeline.activeSegmentCount);
@@ -554,6 +677,9 @@ export function RacePage() {
       setIsPlaying(false);
       return;
     }
+    if (pendingPlayStartT !== null) {
+      return;
+    }
     const startT =
       timelineTRef.current >= timeline.activeSegmentCount - 0.001 ? 0 : timelineTRef.current;
     if (startT === 0) {
@@ -561,22 +687,110 @@ export function RacePage() {
       setUiTimelineT(0);
       lastSpokenKeyRef.current = null;
     }
+    const needsCommentaryWait =
+      commentaryEnabled &&
+      (isCommentaryStale || commentaryQuery.isPending || commentaryQuery.isFetching);
+    if (needsCommentaryWait) {
+      // Unlock browser speechSynthesis synchronously inside the user's click gesture
+      if (ttsEnabled) {
+        speakText(' ', ttsVoiceUri);
+      }
+      setPendingPlayStartT(startT);
+      if (isCommentaryStale && !commentaryQuery.isFetching) {
+        triggerCommentaryRefresh();
+      }
+      return;
+    }
     unlockAndSpeakForT(startT);
     setIsPlaying(true);
-  }, [timeline, isPlaying, unlockAndSpeakForT]);
+  }, [
+    timeline,
+    isPlaying,
+    pendingPlayStartT,
+    commentaryEnabled,
+    isCommentaryStale,
+    commentaryQuery.isPending,
+    commentaryQuery.isFetching,
+    ttsEnabled,
+    ttsVoiceUri,
+    triggerCommentaryRefresh,
+    unlockAndSpeakForT,
+  ]);
 
   const handleReplay = useCallback(() => {
     if (!timeline) return;
+    cancelSpeech();
     timelineTRef.current = 0;
     setUiTimelineT(0);
     lastSpokenKeyRef.current = null;
+    const needsCommentaryWait =
+      commentaryEnabled &&
+      (isCommentaryStale || commentaryQuery.isPending || commentaryQuery.isFetching);
+    if (needsCommentaryWait) {
+      if (ttsEnabled) {
+        speakText(' ', ttsVoiceUri);
+      }
+      setIsPlaying(false);
+      setPendingPlayStartT(0);
+      if (isCommentaryStale && !commentaryQuery.isFetching) {
+        triggerCommentaryRefresh();
+      }
+      return;
+    }
     unlockAndSpeakForT(0);
     setIsPlaying(true);
-  }, [timeline, unlockAndSpeakForT]);
+  }, [
+    timeline,
+    commentaryEnabled,
+    isCommentaryStale,
+    commentaryQuery.isPending,
+    commentaryQuery.isFetching,
+    ttsEnabled,
+    ttsVoiceUri,
+    triggerCommentaryRefresh,
+    unlockAndSpeakForT,
+  ]);
+
+  // Start deferred playback automatically as soon as updated commentary finishes loading
+  useEffect(() => {
+    if (pendingPlayStartT === null || !timeline) {
+      return;
+    }
+    if (!commentaryEnabled) {
+      const targetT = Math.min(timeline.activeSegmentCount, pendingPlayStartT);
+      timelineTRef.current = targetT;
+      setUiTimelineT(targetT);
+      setPendingPlayStartT(null);
+      setIsPlaying(true);
+      return;
+    }
+    if (
+      commentaryQuery.isPending ||
+      commentaryQuery.isFetching ||
+      (isCommentaryStale && !commentaryQuery.isError)
+    ) {
+      return;
+    }
+    const targetT = Math.min(timeline.activeSegmentCount, pendingPlayStartT);
+    timelineTRef.current = targetT;
+    setUiTimelineT(targetT);
+    lastSpokenKeyRef.current = null;
+    setPendingPlayStartT(null);
+    setIsPlaying(true);
+  }, [
+    pendingPlayStartT,
+    timeline,
+    commentaryEnabled,
+    isCommentaryStale,
+    commentaryQuery.isPending,
+    commentaryQuery.isFetching,
+    commentaryQuery.isError,
+  ]);
 
   const handleSkipToFinish = useCallback(() => {
     if (!timeline) return;
     cancelSpeech();
+    setPendingPlayStartT(null);
     timelineTRef.current = timeline.activeSegmentCount;
     setUiTimelineT(timeline.activeSegmentCount);
     setIsPlaying(false);
@@ -613,11 +827,19 @@ export function RacePage() {
 
   const hasCurrentUser = Boolean(raceData?.standings.some((s) => s.isCurrentUser));
   const isToday = dateMode === 'today' && date === getTodayIsoDate();
-  const isCommentaryLoading = commentaryEnabled && Boolean(raceData) && commentaryQuery.isPending;
+  const isCommentaryLoading =
+    commentaryEnabled &&
+    Boolean(raceData) &&
+    (commentaryQuery.isPending ||
+      pendingPlayStartT !== null ||
+      (commentaryQuery.isFetching && isCommentaryStale));
 
   const playOverlayMode: 'hidden' | 'play' | 'replay' | 'loading' = useMemo(() => {
     if (!timeline || isPlaying) {
       return 'hidden';
+    }
+    if (pendingPlayStartT !== null) {
+      return 'loading';
     }
     if (isCommentaryLoading && uiTimelineT <= 0.001) {
       return 'loading';
@@ -629,7 +851,7 @@ export function RacePage() {
       return 'play';
     }
     return 'hidden';
-  }, [timeline, isPlaying, isCommentaryLoading, uiTimelineT]);
+  }, [timeline, isPlaying, pendingPlayStartT, isCommentaryLoading, uiTimelineT]);
 
   return (
     <div className={`page-stack ${styles.racePageStack}`}>
@@ -733,7 +955,7 @@ export function RacePage() {
                 type="button"
                 className={`btn btn-secondary btn-sm ${styles.refreshBtn}`}
                 disabled={raceQuery.isFetching}
-                onClick={() => void raceQuery.refetch()}
+                onClick={() => void handleRefresh()}
                 aria-label="Refresh race standings"
                 title={
                   raceData
@@ -803,9 +1025,12 @@ export function RacePage() {
                   }
                   data={commentaryQuery.data}
                   isPending={commentaryQuery.isPending}
+                  isFetching={commentaryQuery.isFetching}
+                  isStale={isCommentaryStale}
                   error={commentaryQuery.error}
                   lastSpokenKeyRef={lastSpokenKeyRef}
                   onToggleEnabled={() => setCommentaryEnabled((v) => !v)}
+                  onRefreshCommentary={() => triggerCommentaryRefresh()}
                   onSetTtsEnabled={setTtsEnabled}
                   onSelectVoiceUri={setTtsVoiceUri}
                 />

@@ -247,6 +247,32 @@ function computeSnapshotHash(snapshot: RaceProgressionSnapshot): string {
   return crypto.createHash('sha256').update(canonical).digest('hex');
 }
 
+/**
+ * Hashes only the narrative-defining outcome of the race (leaders, winners, daily rank order,
+ * overtakes, overdrive state, and active/resting status), intentionally excluding raw lap counts.
+ * When this hash changes, previously cached commentary could narrate the wrong outcome and must
+ * bypass the 5-minute cooldown; when it stays the same, minor step trickles still respect cooldown.
+ */
+function computeOutcomeHash(snapshot: RaceProgressionSnapshot): string {
+  const canonical = JSON.stringify({
+    v: COMMENTARY_PROMPT_VERSION,
+    range: snapshot.range,
+    startDate: snapshot.startDate,
+    endDate: snapshot.endDate,
+    hasAnyActivity: snapshot.hasAnyActivity,
+    includesFinalDay: snapshot.includesFinalDay,
+    finalWinners: snapshot.finalWinners,
+    days: snapshot.days.map((d) => ({
+      date: d.date,
+      isFinalDay: d.isFinalDay,
+      leaderNames: d.leaderNames,
+      overtakes: d.overtakes,
+      riders: d.riders.map((r) => [r.name, r.rank, r.inOverdrive, r.resting]),
+    })),
+  });
+  return crypto.createHash('sha256').update(canonical).digest('hex');
+}
+
 async function getGeminiApiKey(): Promise<string> {
   if (cachedGeminiApiKey) {
     return cachedGeminiApiKey;
@@ -528,6 +554,7 @@ export const handler = async (
     }
 
     const dataHash = computeSnapshotHash(snapshot);
+    const outcomeHash = computeOutcomeHash(snapshot);
     const tableName = getTableName();
     const pk = keys.groupPk(groupId);
     const sk = keys.commentarySk(range, race.startDate);
@@ -545,9 +572,15 @@ export const handler = async (
       return jsonResponse(200, toResponse(existing, true));
     }
 
-    // 4. Enforce 5-minute regeneration cooldown if stats are actively trickling in
-    // (Allow immediate upgrade if cached entry came from an older promptVersion)
-    if (existing && existing.promptVersion === COMMENTARY_PROMPT_VERSION) {
+    // 4. Enforce 5-minute regeneration cooldown ONLY for minor score trickles where the race
+    // outcome (leaders, winners, daily rankings, overtakes, overdrive, resting/active) is unchanged.
+    // Bypass cooldown immediately whenever the outcome flips so commentary never calls the wrong result.
+    const outcomeUnchanged = Boolean(existing?.outcomeHash) && existing?.outcomeHash === outcomeHash;
+    if (
+      existing &&
+      existing.promptVersion === COMMENTARY_PROMPT_VERSION &&
+      outcomeUnchanged
+    ) {
       const generatedMs = Date.parse(existing.generatedAt);
       const hasAllActiveDays = existing.days.length >= snapshot.days.length;
       if (
@@ -575,6 +608,7 @@ export const handler = async (
       startDate: race.startDate,
       endDate: race.endDate,
       dataHash,
+      outcomeHash,
       promptVersion: COMMENTARY_PROMPT_VERSION,
       headline: generated.headline,
       days: generated.days,

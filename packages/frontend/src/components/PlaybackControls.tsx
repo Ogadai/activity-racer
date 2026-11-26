@@ -140,18 +140,43 @@ export function PlaybackControls({
           <button
             type="button"
             className={`btn btn-primary btn-sm ${styles.transportBtn}`}
+            disabled={!isPlaying && waitingForCommentary}
+            aria-busy={!isPlaying && waitingForCommentary}
             onClick={onTogglePlay}
-            aria-label={isPlaying ? 'Pause race animation' : isAtFinish ? 'Play again' : 'Play race animation'}
-            title={isPlaying ? 'Pause' : isAtFinish ? 'Play Again' : 'Play'}
+            aria-label={
+              isPlaying
+                ? 'Pause race animation'
+                : waitingForCommentary
+                  ? 'Updating commentary before playback'
+                  : isAtFinish
+                    ? 'Play again'
+                    : 'Play race animation'
+            }
+            title={
+              isPlaying
+                ? 'Pause'
+                : waitingForCommentary
+                  ? 'Updating commentary...'
+                  : isAtFinish
+                    ? 'Play Again'
+                    : 'Play'
+            }
           >
             {isPlaying ? <PauseIcon size={17} /> : <PlayIcon size={17} />}
             <span className={styles.transportBtnLabel}>
-              {isPlaying ? 'Pause' : isAtFinish ? 'Play Again' : 'Play'}
+              {isPlaying
+                ? 'Pause'
+                : waitingForCommentary
+                  ? 'Loading...'
+                  : isAtFinish
+                    ? 'Play Again'
+                    : 'Play'}
             </span>
           </button>
           <button
             type="button"
             className={`btn btn-secondary btn-sm ${styles.transportBtn}`}
+            disabled={!isPlaying && waitingForCommentary}
             onClick={onReplay}
             aria-label="Replay race from start"
             title="Replay"

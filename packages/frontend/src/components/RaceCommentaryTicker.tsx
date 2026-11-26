@@ -20,9 +20,12 @@ interface RaceCommentaryTickerProps {
   isFinalDay: boolean;
   data: RaceCommentaryResponse | undefined;
   isPending: boolean;
+  isFetching: boolean;
+  isStale: boolean;
   error: unknown;
   lastSpokenKeyRef: React.MutableRefObject<string | null>;
   onToggleEnabled: () => void;
+  onRefreshCommentary: () => void;
   onSetTtsEnabled: (enabled: boolean) => void;
   onSelectVoiceUri: (voiceUri: string | null) => void;
 }
@@ -44,9 +47,12 @@ export function RaceCommentaryTicker({
   isFinalDay,
   data,
   isPending,
+  isFetching,
+  isStale,
   error,
   lastSpokenKeyRef,
   onToggleEnabled,
+  onRefreshCommentary,
   onSetTtsEnabled,
   onSelectVoiceUri,
 }: RaceCommentaryTickerProps) {
@@ -97,7 +103,7 @@ export function RaceCommentaryTicker({
       return;
     }
 
-    if (!enabled || !ttsEnabled || !activeEntry?.commentary) {
+    if (!enabled || !ttsEnabled || isStale || isFetching || !activeEntry?.commentary) {
       cancelSpeech();
       lastSpokenKeyRef.current = null;
       return;
@@ -117,7 +123,17 @@ export function RaceCommentaryTicker({
     }
     lastSpokenKeyRef.current = speakKey;
     speakText(activeEntry.commentary, ttsVoiceUri);
-  }, [enabled, ttsEnabled, ttsVoiceUri, isPlaying, activeEntry, data?.generatedAt, lastSpokenKeyRef]);
+  }, [
+    enabled,
+    ttsEnabled,
+    ttsVoiceUri,
+    isPlaying,
+    isStale,
+    isFetching,
+    activeEntry,
+    data?.generatedAt,
+    lastSpokenKeyRef,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -141,7 +157,7 @@ export function RaceCommentaryTicker({
     setVoiceMenuOpen(latest.voices.length > 0);
 
     // Synchronously unlock browser speech synthesis inside this click gesture
-    if (isPlaying && activeEntry?.commentary) {
+    if (isPlaying && !isStale && !isFetching && activeEntry?.commentary) {
       lastSpokenKeyRef.current = buildCommentarySpeakKey(
         data?.generatedAt,
         activeEntry.date,
@@ -155,9 +171,9 @@ export function RaceCommentaryTicker({
     onSelectVoiceUri(nextUri);
     setVoiceMenuOpen(false);
     // Audition chosen voice immediately inside the user gesture (also unlocks TTS)
-    const previewText =
-      isPlaying && activeEntry?.commentary ? activeEntry.commentary : 'Ready to race!';
-    if (isPlaying && activeEntry?.commentary) {
+    const canSpeakEntry = isPlaying && !isStale && !isFetching && Boolean(activeEntry?.commentary);
+    const previewText = canSpeakEntry && activeEntry ? activeEntry.commentary : 'Ready to race!';
+    if (canSpeakEntry && activeEntry) {
       lastSpokenKeyRef.current = buildCommentarySpeakKey(
         data?.generatedAt,
         activeEntry.date,
@@ -183,10 +199,12 @@ export function RaceCommentaryTicker({
   }
 
   const isNotConfigured = error instanceof ApiError && error.status === 503;
+  const showUpdating = isFetching && (isStale || !data);
+  const showStalePrompt = isStale && !isFetching;
 
   return (
     <div
-      className={`${styles.ticker}${isFinalDay && activeEntry ? ` ${styles.finalDay}` : ''}`}
+      className={`${styles.ticker}${isFinalDay && activeEntry && !isStale && !showUpdating ? ` ${styles.finalDay}` : ''}`}
       role="status"
       aria-live="polite"
     >
@@ -195,20 +213,39 @@ export function RaceCommentaryTicker({
           <p className={`${styles.text} muted`}>Tuning into the velodrome booth...</p>
         )}
 
-        {!isPending && isNotConfigured && (
+        {!isPending && showUpdating && (
+          <p className={`${styles.text} muted`}>Updating race commentary...</p>
+        )}
+
+        {!isPending && !showUpdating && showStalePrompt && (
+          <div className={styles.staleBanner}>
+            <p className={`${styles.text} muted`}>
+              Standings changed — commentary is out of date.
+            </p>
+            <button
+              type="button"
+              className={`btn btn-secondary btn-xs ${styles.updateBtn}`}
+              onClick={onRefreshCommentary}
+            >
+              Update
+            </button>
+          </div>
+        )}
+
+        {!isPending && !showUpdating && !showStalePrompt && isNotConfigured && (
           <p className={`${styles.text} muted`}>
             AI Announcer ready once your Gemini key is saved in SSM (
             <code className="code-inline">/activity-racer/gemini-api-key</code>).
           </p>
         )}
 
-        {!isPending && Boolean(error) && !isNotConfigured && (
+        {!isPending && !showUpdating && !showStalePrompt && Boolean(error) && !isNotConfigured && (
           <p className={`${styles.text} muted`}>
             {error instanceof Error ? error.message : 'Race commentary temporarily unavailable.'}
           </p>
         )}
 
-        {activeEntry && (
+        {!showUpdating && !showStalePrompt && activeEntry && (
           <p key={activeEntry.date} className={`${styles.text} ${styles.fadeIn}`}>
             {activeEntry.commentary}
           </p>
