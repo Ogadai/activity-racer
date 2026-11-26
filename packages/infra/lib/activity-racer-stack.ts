@@ -33,11 +33,13 @@ export class ActivityRacerStack extends cdk.Stack {
     const callbackPath = '/auth/callback';
     const logoutPath = '/login';
 
-    // 1. Single-table DynamoDB store (on-demand, zero idle cost, clean dev teardown)
+    // 1. Single-table DynamoDB store (Provisioned 5 RCU/5 WCU on table + GSI1 = 10/10 total, within 25/25 Always Free)
     const table = new dynamodb.Table(this, 'ActivityRacerTable', {
       partitionKey: { name: 'PK', type: dynamodb.AttributeType.STRING },
       sortKey: { name: 'SK', type: dynamodb.AttributeType.STRING },
-      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      billingMode: dynamodb.BillingMode.PROVISIONED,
+      readCapacity: 5,
+      writeCapacity: 5,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
@@ -46,25 +48,11 @@ export class ActivityRacerStack extends cdk.Stack {
       partitionKey: { name: 'GSI1PK', type: dynamodb.AttributeType.STRING },
       sortKey: { name: 'GSI1SK', type: dynamodb.AttributeType.STRING },
       projectionType: dynamodb.ProjectionType.ALL,
+      readCapacity: 5,
+      writeCapacity: 5,
     });
 
-    // 2. API Gateway HTTP API + Private S3 SPA Bucket (created before Cognito Client so callback URLs are known)
-    const httpApi = new apigwv2.HttpApi(this, 'ActivityRacerApi', {
-      apiName: 'activity-racer-api',
-      corsPreflight: {
-        allowHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
-        allowMethods: [
-          apigwv2.CorsHttpMethod.GET,
-          apigwv2.CorsHttpMethod.POST,
-          apigwv2.CorsHttpMethod.PUT,
-          apigwv2.CorsHttpMethod.OPTIONS,
-        ],
-        allowOrigins: ['*'],
-      },
-    });
-
-    const apiBaseUrl = `${httpApi.apiEndpoint}/api`;
-
+    // 2. Private S3 SPA Bucket + optional CloudFront OAC (created before HTTP API so CORS & Cognito URLs are known)
     const siteBucket = new s3.Bucket(this, 'FrontendBucket', {
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       encryption: s3.BucketEncryption.S3_MANAGED,
@@ -74,7 +62,6 @@ export class ActivityRacerStack extends cdk.Stack {
     });
 
     let distribution: cloudfront.Distribution | undefined;
-    let frontendUrl: string;
 
     if (enableCloudFront) {
       // Production-preferred path: CloudFront OAC in front of private S3 (no Lambda@Edge)
@@ -87,12 +74,14 @@ export class ActivityRacerStack extends cdk.Stack {
           origin: s3Origin,
           viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
           cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+          responseHeadersPolicy: cloudfront.ResponseHeadersPolicy.SECURITY_HEADERS,
         },
         additionalBehaviors: {
           '/config.json': {
             origin: s3Origin,
             viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
             cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+            responseHeadersPolicy: cloudfront.ResponseHeadersPolicy.SECURITY_HEADERS,
           },
         },
         errorResponses: [
@@ -110,11 +99,30 @@ export class ActivityRacerStack extends cdk.Stack {
           },
         ],
       });
-
-      frontendUrl = `https://${distribution.distributionDomainName}`;
-    } else {
-      frontendUrl = httpApi.apiEndpoint;
     }
+
+    const corsAllowOrigins = distribution
+      ? [`https://${distribution.distributionDomainName}`, 'http://localhost:5173']
+      : ['*'];
+
+    const httpApi = new apigwv2.HttpApi(this, 'ActivityRacerApi', {
+      apiName: 'activity-racer-api',
+      corsPreflight: {
+        allowHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
+        allowMethods: [
+          apigwv2.CorsHttpMethod.GET,
+          apigwv2.CorsHttpMethod.POST,
+          apigwv2.CorsHttpMethod.PUT,
+          apigwv2.CorsHttpMethod.OPTIONS,
+        ],
+        allowOrigins: corsAllowOrigins,
+      },
+    });
+
+    const apiBaseUrl = `${httpApi.apiEndpoint}/api`;
+    const frontendUrl = distribution
+      ? `https://${distribution.distributionDomainName}`
+      : httpApi.apiEndpoint;
 
     // 3. Amazon Cognito User Pool, Managed Login v2 Domain & OAuth 2.0 PKCE Public SPA Client
     // Note: selfSignUpEnabled is false to prevent public email/password registration;
