@@ -369,7 +369,14 @@ export class ActivityRacerStack extends cdk.Stack {
         sources: deploySources,
         destinationBucket: siteBucket,
         distribution,
-        distributionPaths: ['/index.html', '/config.json'],
+        distributionPaths: [
+          '/index.html',
+          '/config.json',
+          '/site.webmanifest',
+          '/favicon*',
+          '/icon-*',
+          '/apple-touch-icon.png',
+        ],
       });
     } else {
       // Temporary Option B3 stand-in while CloudFront verification is pending:
