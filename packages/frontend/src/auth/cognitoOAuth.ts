@@ -108,7 +108,7 @@ function requireOAuthConfig(config: RuntimeConfig): {
 
 export function loadStoredSession(): StoredSession | null {
   try {
-    const raw = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
+    const raw = window.localStorage.getItem(SESSION_STORAGE_KEY);
     if (!raw) {
       return null;
     }
@@ -119,21 +119,22 @@ export function loadStoredSession(): StoredSession | null {
       typeof parsed?.expiresAt !== 'number' ||
       typeof parsed?.user?.sub !== 'string'
     ) {
-      window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
+      window.localStorage.removeItem(SESSION_STORAGE_KEY);
       return null;
     }
     return parsed;
   } catch {
-    window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
+    window.localStorage.removeItem(SESSION_STORAGE_KEY);
     return null;
   }
 }
 
 export function saveStoredSession(session: StoredSession): void {
-  window.sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+  window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
 }
 
 export function clearStoredSession(): void {
+  window.localStorage.removeItem(SESSION_STORAGE_KEY);
   window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
   window.sessionStorage.removeItem(PENDING_AUTH_STORAGE_KEY);
 }
