@@ -40,7 +40,8 @@ export class ActivityRacerStack extends cdk.Stack {
       billingMode: dynamodb.BillingMode.PROVISIONED,
       readCapacity: 5,
       writeCapacity: 5,
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      deletionProtection: true,
     });
 
     table.addGlobalSecondaryIndex({
@@ -145,7 +146,8 @@ export class ActivityRacerStack extends cdk.Stack {
       },
       mfa: cognito.Mfa.OFF,
       accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      deletionProtection: true,
     });
 
     const userPoolDomain = userPool.addDomain('ActivityRacerDomain', {
